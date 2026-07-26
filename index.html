@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dunno</title>
+  <link rel="icon" href="icon.png" type="image/png" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#dde3ff" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body class="dark">
+  <div id="layout"></div>
+  <script type="module" src="js/main.js"></script>
+  <script>
+    if ('serviceWorker' in navigator)
+      navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
+  </script>
+</body>
+</html>

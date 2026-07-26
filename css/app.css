@@ -1,0 +1,283 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --tag-bg:        #dde3ff;
+  --tag-bg-active: #b8c4ff;
+  --tag-fg:        #000000;
+  --body-bg:       #ffffff;
+  --border:        #9999bb;
+  --font-mono:     'Menlo', 'Monaco', 'Consolas', monospace;
+  --diff-del-bg:     #fff0f0;
+  --diff-del-fg:     #880000;
+  --diff-del-gutter: #cc3333;
+  --diff-del-word:   #ffcccc;
+  --diff-ins-bg:     #f0fff0;
+  --diff-ins-fg:     #006600;
+  --diff-ins-gutter: #33aa33;
+  --diff-ins-word:   #ccffcc;
+  --diff-eq-fg:      #333333;
+}
+
+body.dark {
+  --tag-bg:        #1e2040;
+  --tag-bg-active: #2d3060;
+  --tag-fg:        #ccccee;
+  --body-bg:       #0f1020;
+  --border:        #3a3a6a;
+  --diff-del-bg:     #2a1010;
+  --diff-del-fg:     #ff9999;
+  --diff-del-gutter: #cc4444;
+  --diff-del-word:   #4a2020;
+  --diff-ins-bg:     #102a10;
+  --diff-ins-fg:     #99ff99;
+  --diff-ins-gutter: #44aa44;
+  --diff-ins-word:   #204a20;
+  --diff-eq-fg:      #aaaacc;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--body-bg);
+  color: var(--tag-fg);
+}
+
+#layout {
+  display: flex;
+  flex-direction: row;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* ── Columns ────────────────────────────────────────────── */
+
+.column {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+}
+.column:last-child { border-right: none; }
+
+/* ── Column resize handle ───────────────────────────────── */
+
+.resize-h {
+  flex-shrink: 0;
+  width: 4px;
+  background: var(--border);
+  cursor: ew-resize;
+  transition: background 0.15s;
+  z-index: 5;
+}
+.resize-h:hover { background: var(--tag-bg-active); }
+
+/* ── Panes ──────────────────────────────────────────────── */
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  border-bottom: 1px solid var(--border);
+}
+.pane:last-child { border-bottom: none; }
+
+/* ── Pane resize handle ─────────────────────────────────── */
+
+.resize-v {
+  flex-shrink: 0;
+  height: 4px;
+  background: var(--border);
+  cursor: ns-resize;
+  transition: background 0.15s;
+  z-index: 5;
+}
+.resize-v:hover { background: var(--tag-bg-active); }
+
+/* ── Tag bar ────────────────────────────────────────────── */
+
+.pane-tag-bar {
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  background: var(--tag-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.pane.active > .pane-tag-bar {
+  background: var(--tag-bg-active);
+}
+
+.pane-filename {
+  display: flex;
+  align-items: center;
+  padding: 3px 4px 3px 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--tag-fg);
+  opacity: 0.65;
+  white-space: nowrap;
+  user-select: none;
+  cursor: default;
+}
+
+.pane-dirty {
+  display: flex;
+  align-items: center;
+  padding: 3px 6px 3px 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #ff8844;
+  user-select: none;
+  cursor: default;
+}
+
+.pane-tag {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  outline: none;
+  cursor: text;
+  scrollbar-width: none;
+}
+.pane-tag::-webkit-scrollbar { display: none; }
+
+/* ── Pane body ──────────────────────────────────────────── */
+
+.pane-body {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--body-bg);
+  position: relative;
+}
+
+/* ── Editor ─────────────────────────────────────────────── */
+
+.editor {
+  min-height: 100%;
+  padding: 14px 18px;
+  outline: none;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--tag-fg);
+  overflow-y: visible !important;
+}
+
+/* ── Display pane (plot output etc.) ───────────────────── */
+
+.pane-display {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+.pane-display svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Diff gutter overlay (left edge) ───────────────────── */
+
+.diff-gutter {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 6px;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.diff-mark {
+  position: absolute;
+  left: 0;
+  width: 6px;
+}
+
+.diff-mark-del { background: var(--diff-del-gutter); }
+.diff-mark-ins { background: var(--diff-ins-gutter); }
+
+/* ── Find gutter overlay (right edge) ──────────────────── */
+
+.find-gutter {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.find-mark {
+  position: absolute;
+  right: 0;
+  width: 6px;
+  background: #bb9900;
+  opacity: 0.7;
+}
+
+.find-mark-current {
+  background: #ff8800;
+  opacity: 1;
+  width: 8px;
+  right: -1px;
+}
+
+/* ── Find/Replace bar ───────────────────────────────────── */
+
+.find-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--tag-bg);
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.find-bar input {
+  background: var(--body-bg);
+  color: var(--tag-fg);
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  outline: none;
+  min-width: 140px;
+}
+.find-bar input:focus { border-color: var(--tag-bg-active); }
+
+.find-count {
+  color: var(--tag-fg);
+  opacity: 0.6;
+  min-width: 44px;
+  text-align: center;
+}
+
+.find-btn {
+  background: transparent;
+  color: var(--tag-fg);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.find-btn:hover { background: var(--tag-bg-active); }

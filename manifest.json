@@ -1,0 +1,9 @@
+{
+  "name": "dunno",
+  "short_name": "dunno",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#dde3ff",
+  "icons": []
+}
