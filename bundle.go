@@ -7,6 +7,7 @@ package main
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -31,6 +32,20 @@ func readText(path string) string {
 		panic(fmt.Sprintf("read %s: %v", path, err))
 	}
 	return string(b)
+}
+
+func readManifestVersion(rootDir string) string {
+	b, err := os.ReadFile(filepath.Join(rootDir, "manifest.json"))
+	if err != nil {
+		return "dev"
+	}
+	var m struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(b, &m); err != nil || m.Version == "" {
+		return "dev"
+	}
+	return m.Version
 }
 
 // ── JS module bundler ─────────────────────────────────────────────────────────
@@ -143,6 +158,17 @@ func processHtml(src, rootDir string) string {
 		return "<style>\n" + css + "\n</style>"
 	})
 
+	// Inline plain <script src="..."> files.
+	reScriptSrc := regexp.MustCompile(`<script src="([^"]+)"></script>`)
+	src = reScriptSrc.ReplaceAllStringFunc(src, func(match string) string {
+		m := reScriptSrc.FindStringSubmatch(match)
+		if m == nil {
+			return match
+		}
+		js := readText(filepath.Join(rootDir, m[1]))
+		return "<script>\n" + js + "\n</script>"
+	})
+
 	// Replace ES module entry point with IIFE bundle.
 	reModule := regexp.MustCompile(`<script type="module" src="js/main\.js"></script>`)
 	src = reModule.ReplaceAllLiteralString(src, buildIifeBundle(rootDir))
@@ -163,6 +189,7 @@ func main() {
 
 	indexHtml := readText(filepath.Join(rootDir, "index.html"))
 	result := processHtml(indexHtml, rootDir)
+	result = strings.ReplaceAll(result, "__DUNNO_VERSION__", readManifestVersion(rootDir))
 
 	outPath, err := filepath.Abs(*outFlag)
 	if err != nil {

@@ -1,0 +1,141 @@
+diff --git a/index.html b/index.html
+index 5afa75a..efd8a3e 100644
+--- a/index.html
++++ b/index.html
+@@ -12,6 +12,13 @@
+ <body class="dark">
+   <div id="layout"></div>
+   <script src="libs/marked.min.js"></script>
++  <script src="libs/prettier/standalone.js"></script>
++  <script src="libs/prettier/babel.js"></script>
++  <script src="libs/prettier/estree.js"></script>
++  <script src="libs/prettier/postcss.js"></script>
++  <script src="libs/prettier/markdown.js"></script>
++  <script src="libs/prettier/html.js"></script>
++  <script src="libs/prettier/yaml.js"></script>
+   <script type="module" src="js/main.js"></script>
+   <script>
+     if ('serviceWorker' in navigator)
+diff --git a/js/format.js b/js/format.js
+new file mode 100644
+index 0000000..f9bc9ce
+--- /dev/null
++++ b/js/format.js
+@@ -0,0 +1,37 @@
++// ── Format (Prettier) ──────────────────────────────────────────────────────
++// Language resolution: explicit selection word > file extension > null (unknown).
++
++const EXT_TO_PARSER = {
++  js: 'babel', jsx: 'babel', mjs: 'babel', cjs: 'babel', json: 'json',
++  css: 'css', scss: 'scss', less: 'less',
++  html: 'html', htm: 'html',
++  md: 'markdown', markdown: 'markdown',
++  yml: 'yaml', yaml: 'yaml',
++};
++
++// Selection word aliases -> prettier `parser` value.
++const ALIASES = {
++  js: 'babel', javascript: 'babel', jsx: 'babel',
++  css: 'css', scss: 'scss', less: 'less',
++  html: 'html',
++  markdown: 'markdown', md: 'markdown',
++  yaml: 'yaml', yml: 'yaml',
++  json: 'json',
++};
++
++export function resolveParser(selection, filename) {
++  const bySel = selection && ALIASES[selection.trim().toLowerCase()];
++  if (bySel) return bySel;
++  const ext = filename?.split('.').pop()?.toLowerCase();
++  return ext ? EXT_TO_PARSER[ext] ?? null : null;
++}
++
++function _plugins() {
++  const p = window.prettierPlugins || {};
++  return [p.babel, p.estree, p.postcss, p.markdown, p.html, p.yaml].filter(Boolean);
++}
++
++export async function formatSource(source, parser) {
++  if (!window.prettier) throw new Error('prettier not loaded');
++  return window.prettier.format(source, { parser, plugins: _plugins() });
++}
+diff --git a/js/help.js b/js/help.js
+index 9c0d24f..552f69b 100644
+--- a/js/help.js
++++ b/js/help.js
+@@ -21,6 +21,7 @@ const SECTIONS = [
+     { cmd: 'Plot',    desc: 'Render gnuplot spec (prev pane as data)' },
+     { cmd: 'Eval',    desc: 'Run pane as JS; stdout → split pane' },
+     { cmd: 'Preview', desc: 'Render pane as Markdown → HTML' },
++    { cmd: 'Format',  desc: 'Reformat pane (select a language, or infer from filename)' },
+   ]},
+   { heading: 'Theme', items: [
+     { cmd: 'dark',  desc: 'Switch to dark theme' },
+@@ -125,6 +126,31 @@ Supported: headings, bold/italic, code blocks, blockquotes,
+ <b>Tip</b>: combine with Load to preview a .md file from disk.`,
+   },
+ 
++  format: {
++    title: 'Format',
++    body: `Format reformats the current pane's content in place using Prettier.
++
++<b>Choosing a language</b>
++  Select a language word first, then right-click <b>Format</b>:
++    js  jsx  javascript  css  scss  less  html  markdown  md  yaml  yml  json
++
++  No selection? Format falls back to the pane's loaded filename extension
++  (.js .jsx .mjs .cjs .css .scss .less .html .htm .md .markdown .yml .yaml .json).
++
++  Neither available → a toast asks you to select a language.
++
++<b>Example</b>
++  Select <b>js</b> anywhere (tag bar or body), right-click <b>Format</b>
++  — same mechanic as selecting <b>plot</b> then right-clicking <b>Help</b>.
++
++<b>Notes</b>
++  • Formatting happens in place — no split pane, the buffer is rewritten.
++  • Marks the pane dirty, same as any manual edit.
++  • Not in the default tag bar; type <b>Format</b> into a pane's tag bar
++    once, same as Diff / Preview / Eval / Plot.
++  • TypeScript is not supported (parser omitted to keep bundle size down).`,
++  },
++
+   find: {
+     title: 'Find / Replace',
+     body: `Find opens a search bar at the bottom of the current pane.
+diff --git a/js/main.js b/js/main.js
+index cafc3fc..c26d44d 100644
+--- a/js/main.js
++++ b/js/main.js
+@@ -10,6 +10,7 @@ import { register } from './commands.js';
+ import { parsePlotSpec, renderSVG } from './plot.js';
+ import { openFind, openReplace } from './find.js';
+ import { renderPreviewHTML } from './preview.js';
++import { formatSource, resolveParser } from './format.js';
+ import { renderHelpHTML } from './help.js';
+ import { loadVersion } from './version.js';
+ 
+@@ -130,6 +131,23 @@ register('Preview', ctx => {
+   setPaneDisplay(outId, html);
+ });
+ 
++// ── Format (Prettier) ────────────────────────────────────────────────────────
++
++register('Format', async ctx => {
++  const { name } = getPaneFile(ctx.paneId) ?? {};
++  const parser = resolveParser(ctx.selection, name);
++  if (!parser) {
++    _toast('Format: select a language (js/css/scss/less/html/markdown/yaml/json) or load a file with a known extension');
++    return;
++  }
++  try {
++    const formatted = await formatSource(ctx.pane.jar.toString(), parser);
++    ctx.pane.jar.updateCode(formatted);
++  } catch (e) {
++    _toast('Format failed: ' + e.message);
++  }
++});
++
+ // ── Help ───────────────────────────────────────────────────────────────────────
+ 
+ register('Help', ctx => {

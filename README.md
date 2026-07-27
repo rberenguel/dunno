@@ -1,37 +1,60 @@
 # dunno
 
-A tiled text editor inspired by Plan 9's Acme, with a gnuplot-compatible inline plotter and side-by-side diff.
+A tiled text editor inspired by Plan 9's Acme, with a gnuplot-compatible inline plotter, side-by-side diff, Markdown preview, and JS eval.
 
-Runs as a local HTML file — open `index.html` directly in a browser. No build step, no server.
+## Running
 
-## Usage
+Open `index.html` from a local HTTP server (required for file I/O):
 
-**Right-click any known word** anywhere (tag bar or body) to execute it as a command.
+```sh
+cd dunno && python3 -m http.server 8080
+# then open http://localhost:8080
+```
+
+Or use the single-file build — `go run bundle.go` produces `dist/dunno.html`, which works offline with no external dependencies.
+
+Drag-and-drop files onto any pane works in all contexts including `file://`.
+
+## Core mechanic
+
+**Right-click any known word** anywhere — tag bar or body — to execute it as a command. No menus.
+
+Select text first to give commands context. For example, select `plot` then right-click `Help` to get plot-specific documentation.
+
+## Commands
 
 ### Layout
 
 | Command | Effect |
 |---------|--------|
-| `New` | New pane below in the same column |
-| `Newcol` | New column to the right |
-| `Del` | Delete this pane (last pane is protected) |
+| `New` | Split current pane |
+| `Newcol` | Add a column to the right |
+| `Del` | Delete this pane |
 
-### Diff
+### File I/O
 
-`Diff` compares the current pane against the **previously active** pane and paints a gutter on the left edge:
+| Command | Effect |
+|---------|--------|
+| `Load` | Open a file via picker (localhost/HTTPS) or drag-and-drop |
+| `Save` | Write to file via picker, or download as blob if picker unavailable |
+| `Get` | Reload from file, or restore session from localStorage |
 
-- Solid red bar — line exists here but differs from the other pane
-- Thin green stripe — other pane has lines here that this one doesn't
+Autosaves to localStorage every 30s and on unload. `⌘S` / `Ctrl+S` saves the session manually.
 
-Right-click `Diff` again to dismiss the gutter.
+### Edit
 
-### Plot
+| Command | Effect |
+|---------|--------|
+| `Find` | Search bar at the bottom of the pane |
+| `Replace` | Find & replace bar |
 
-`Plot` reads the **previously active pane** as data and the current pane as a gnuplot-compatible spec, then renders an SVG below.
+**ed substitute:** select `s/pat/rep/g` anywhere and right-click — the substitution is applied to the pane body. The separator is inferred from the first character after `s`, so `s|foo|bar|` works too.
 
-**Data pane:** CSV, TSV, or whitespace-separated. Optional header row (auto-detected). `#` lines are ignored.
+### View
 
-**Spec pane:**
+**Diff** compares the current pane against the previously active pane. A colour-coded gutter appears on the left edge — red for changed lines, green for lines only in the other pane. Word-level differences are highlighted within changed pairs. Right-click `Diff` again to dismiss.
+
+**Plot** reads the previously active pane as data and the current pane as a gnuplot-compatible spec, then renders an SVG below.
 
 ```gnuplot
 set title "My plot"
@@ -42,29 +65,27 @@ plot "-" using 1:2 with lines title "ch1", \
      "-" using 1:3 with linespoints title "ch2"
 ```
 
-`"-"` always refers to the data pane (equivalent to stdin in real gnuplot — swap it for a filename and the spec runs unchanged in actual gnuplot).
+`"-"` refers to the data pane (equivalent to stdin in real gnuplot — swap for a filename and the spec runs unchanged in actual gnuplot). Right-click `Help` with `plot` selected for full syntax reference and examples.
 
-**Supported `with` styles:** `lines`, `points`, `linespoints`, `dots`, `impulses`, `boxes`/`bars`, `area`, `steps`
+Supported styles: `lines`, `points`, `linespoints`, `dots`, `impulses`, `boxes`/`bars`, `area`, `steps`
 
-Right-click `Plot` again to refresh after editing the spec or the data.
+**Eval** runs the current pane as JavaScript. `console.log/warn/error` output appears in a split pane below.
 
-### Theme & persistence
+**Preview** renders the current pane as Markdown → HTML in a split pane below.
 
-| Command | Effect |
-|---------|--------|
-| `dark` / `light` | Toggle theme |
-| `Save` | Save layout and content to localStorage |
-| `Get` | Restore from localStorage |
+### Theme
 
-`Cmd+S` also saves. State is autosaved every 30 seconds and on page unload.
+Right-click `dark` or `light` anywhere.
 
-## Running
+### Help
 
+Right-click `Help` for the full command reference. Select a command name first (`plot`, `diff`, `eval`, `preview`, `find`) then right-click `Help` for topic-specific documentation with examples.
+
+## Bundling
+
+```sh
+go run bundle.go             # → dist/dunno.html
+go run bundle.go --out foo.html
 ```
-open src/index.html        # macOS
-xdg-open src/index.html    # Linux
-```
 
-Or drag `index.html` onto a browser window.
-
-A single-file build (no external resources, works offline) will be produced by `bundle.go` — see `next.md`.
+Inlines all CSS, JS (ES modules → IIFE), `marked.min.js`, and the favicon as base64. Version is read from `manifest.json` and injected at build time.
