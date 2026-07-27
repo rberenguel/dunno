@@ -16,6 +16,16 @@ const _suppressDirtyFor = new Set();
 
 const _layout = () => document.getElementById('layout');
 
+// Capture selection on right-mousedown before the browser collapses it.
+let _rightClickSel = null;
+
+// File drop handler set by main.js.
+let _fileDropHandler = null;
+export function setFileDropHandler(fn) { _fileDropHandler = fn; }
+document.addEventListener('mousedown', e => {
+  if (e.button === 2) _rightClickSel = window.getSelection?.()?.toString().trim() || null;
+}, true);
+
 // ── Word detection ─────────────────────────────────────────────────────────────
 
 function _wordAtPoint(x, y) {
@@ -54,11 +64,32 @@ export const getActiveId = () => _activeId;
 
 // ── Context menu ───────────────────────────────────────────────────────────────
 
+const _reEdSub = /^s(.)(.+?)\1(.*?)\1([gi]*)$/;
+
+function _tryEdSubstitute(paneId, sel) {
+  if (!sel) return false;
+  const m = sel.match(_reEdSub);
+  if (!m) return false;
+  const pane = _panes.get(paneId);
+  if (!pane) return false;
+  let re;
+  try { re = new RegExp(m[2], m[4] || ''); } catch { return false; }
+  const next = pane.jar.toString().replace(re, m[3]);
+  if (next === pane.jar.toString()) return true; // matched syntax, just no change
+  _suppressDirtyFor.add(paneId);
+  pane.jar.updateCode(next);
+  _suppressDirtyFor.delete(paneId);
+  _markDirty(paneId);
+  return true;
+}
+
 function _onContextMenu(e, paneId) {
+  const sel = _rightClickSel;
+  if (_tryEdSubstitute(paneId, sel)) { e.preventDefault(); return; }
   const word = _wordAtPoint(e.clientX, e.clientY);
   if (word && isCommand(word)) {
     e.preventDefault();
-    execute(word, { paneId, pane: _panes.get(paneId) });
+    execute(word, { paneId, pane: _panes.get(paneId), selection: sel });
   }
 }
 
@@ -257,7 +288,7 @@ export function createPane(colId, content = '', tagText = null) {
   tagEl.className       = 'pane-tag';
   tagEl.contentEditable = 'true';
   tagEl.spellcheck      = false;
-  tagEl.textContent     = tagText ?? 'Del New Newcol Diff';
+  tagEl.textContent     = tagText ?? 'Del New Newcol Help';
   tagEl.addEventListener('keydown', e => { if (e.key === 'Enter') e.preventDefault(); });
 
   bodyEl.className   = 'pane-body';
@@ -282,8 +313,17 @@ export function createPane(colId, content = '', tagText = null) {
 
   tagBarEl.addEventListener('contextmenu', e => _onContextMenu(e, id));
   editorEl.addEventListener('contextmenu', e => _onContextMenu(e, id));
+  bodyEl.addEventListener('contextmenu',   e => { if (!editorEl.contains(e.target)) _onContextMenu(e, id); });
   tagBarEl.addEventListener('mousedown',   () => _setActive(id));
   editorEl.addEventListener('mousedown',   () => _setActive(id));
+
+  bodyEl.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  bodyEl.addEventListener('drop', e => {
+    e.preventDefault();
+    _setActive(id);
+    const file = e.dataTransfer.files[0];
+    if (file && _fileDropHandler) _fileDropHandler(id, file);
+  });
 
   _panes.set(id, {
     id, colId, el, tagBarEl, filenameEl, dirtyEl, tagEl, bodyEl, editorEl, jar,

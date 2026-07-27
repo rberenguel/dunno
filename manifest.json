@@ -1,6 +1,7 @@
 {
   "name": "dunno",
   "short_name": "dunno",
+  "version": "0.2.0",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#ffffff",

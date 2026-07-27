@@ -4,10 +4,28 @@ import {
   getPrev, getPane, setPaneDisplay,
   getState, restoreState,
   setPaneFile, getPaneFile, clearDirty, loadContent,
+  setFileDropHandler,
 } from './tiling.js';
 import { register } from './commands.js';
 import { parsePlotSpec, renderSVG } from './plot.js';
-import { openFind, openReplace, closeFind } from './find.js';
+import { openFind, openReplace } from './find.js';
+import { renderPreviewHTML } from './preview.js';
+import { renderHelpHTML } from './help.js';
+import { loadVersion } from './version.js';
+
+// ── Toast notifications ────────────────────────────────────────────────────────
+
+function _toast(msg, durationMs = 3000) {
+  const el = document.createElement('div');
+  el.className = 'dunno-toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('dunno-toast-show'));
+  setTimeout(() => {
+    el.classList.remove('dunno-toast-show');
+    el.addEventListener('transitionend', () => el.remove(), { once: true });
+  }, durationMs);
+}
 
 // ── Layout commands ────────────────────────────────────────────────────────────
 
@@ -20,8 +38,22 @@ register('light',  () => document.body.classList.remove('dark'));
 
 // ── File I/O ───────────────────────────────────────────────────────────────────
 
+function _downloadBlob(paneId) {
+  const pane = getPane(paneId);
+  if (!pane) return;
+  const { name } = getPaneFile(paneId) ?? {};
+  const blob = new Blob([pane.jar.toString()], { type: 'text/plain' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: name || 'untitled.txt' });
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 register('Load', async ctx => {
-  if (!window.showOpenFilePicker) return;
+  if (!window.showOpenFilePicker) {
+    _toast('Drop a file onto this pane to load it');
+    return;
+  }
   try {
     const [handle] = await window.showOpenFilePicker();
     const file = await handle.getFile();
@@ -44,8 +76,15 @@ register('Save', async ctx => {
     } catch (e) {
       if (e.name !== 'AbortError') console.error(e);
     }
+  } else {
+    _downloadBlob(ctx.paneId);
   }
-  _sessionSave(); // always keep session backup current
+  _sessionSave();
+});
+
+setFileDropHandler(async (paneId, file) => {
+  loadContent(paneId, await file.text());
+  setPaneFile(paneId, null, file.name);
 });
 
 register('Get', async ctx => {
@@ -76,6 +115,33 @@ async function _writeToHandle(paneId, handle) {
 
 register('Find',    ctx => openFind(ctx.pane));
 register('Replace', ctx => openReplace(ctx.pane));
+
+// ── Preview ────────────────────────────────────────────────────────────────────
+
+register('Preview', ctx => {
+  const html = renderPreviewHTML(ctx.pane.jar.toString());
+  let outId = ctx.pane.previewOutputId;
+  if (!outId || !getPane(outId)) {
+    outId = splitPane(ctx.paneId);
+    ctx.pane.previewOutputId = outId;
+    const out = getPane(outId);
+    if (out) out.tagEl.textContent = 'preview Del';
+  }
+  setPaneDisplay(outId, html);
+});
+
+// ── Help ───────────────────────────────────────────────────────────────────────
+
+register('Help', ctx => {
+  let outId = ctx.pane.helpOutputId;
+  if (!outId || !getPane(outId)) {
+    outId = splitPane(ctx.paneId);
+    ctx.pane.helpOutputId = outId;
+    const out = getPane(outId);
+    if (out) out.tagEl.textContent = 'help Del';
+  }
+  setPaneDisplay(outId, renderHelpHTML(ctx.selection));
+});
 
 // ── Eval ───────────────────────────────────────────────────────────────────────
 
@@ -139,7 +205,11 @@ register('Plot', ctx => {
 
 const KEY = 'dunno-state';
 
+let _clearPending = false;
+register('42clear', () => { _clearPending = true; localStorage.removeItem(KEY); location.reload(); });
+
 function _sessionSave() {
+  if (_clearPending) return;
   try {
     const state = getState();
     state.dark = document.body.classList.contains('dark');
@@ -160,28 +230,13 @@ function _sessionLoad() {
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────────
 
-const WELCOME = `dunno
+const WELCOME = `dunno  —  inspired by Plan 9's Acme
 
 Right-click any command word to execute it.
-Works in this body text too, not just the tag bar.
+Right-click Help for commands. Select a word first for topic help.`;
 
-Layout:   Del  New  Newcol
-Tools:    Diff  Plot  Eval
-File:     Load  Save  Get
-Find:     Find  Replace
-Theme:    dark  light
-
-──
-
-Load: load a file into this pane (File System Access API).
-Save: write this pane to its file, or prompt for a filename.
-Get:  reload this pane from its file (or restore session).
-Eval: run this pane as JS; stdout → split pane below.
-Find/Replace: search (and replace) text in this pane.
-Diff: compare against the previously active pane.
-Plot: render a gnuplot-compatible spec using prev pane as data.`;
-
-function _init() {
+async function _init() {
+  await loadVersion();
   if (!_sessionLoad()) {
     const col = createColumn();
     createPane(col, WELCOME);
