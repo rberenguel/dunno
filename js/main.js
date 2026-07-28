@@ -11,6 +11,7 @@ import { parsePlotSpec, renderSVG } from './plot.js';
 import { openFind, openReplace } from './find.js';
 import { renderPreviewHTML } from './preview.js';
 import { formatSource, resolveParser } from './format.js';
+import { attachCalc } from './calc.js';
 import { renderHelpHTML } from './help.js';
 import { loadVersion } from './version.js';
 
@@ -146,6 +147,18 @@ register('Format', async ctx => {
   } catch (e) {
     _toast('Format failed: ' + e.message);
   }
+});
+
+// ── Calc ──────────────────────────────────────────────────────────────────────
+
+register('Calc', ctx => {
+  let outId = ctx.pane.calcOutputId;
+  if (!outId || !getPane(outId)) {
+    outId = splitPane(ctx.paneId);
+    ctx.pane.calcOutputId = outId;
+  }
+  const outPane = getPane(outId);
+  if (outPane) attachCalc(outPane);
 });
 
 // ── Help ───────────────────────────────────────────────────────────────────────

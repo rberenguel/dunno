@@ -22,6 +22,7 @@ const SECTIONS = [
     { cmd: 'Eval',    desc: 'Run pane as JS; stdout → split pane' },
     { cmd: 'Preview', desc: 'Render pane as Markdown → HTML' },
     { cmd: 'Format',  desc: 'Reformat pane (select a language, or infer from filename)' },
+    { cmd: 'Calc',    desc: 'Turn pane into a bc-style calculator (math.js)' },
   ]},
   { heading: 'Theme', items: [
     { cmd: 'dark',  desc: 'Switch to dark theme' },
@@ -124,6 +125,32 @@ Supported: headings, bold/italic, code blocks, blockquotes,
            links, images, tables, horizontal rules.
 
 <b>Tip</b>: combine with Load to preview a .md file from disk.`,
+  },
+
+  calc: {
+    title: 'Calc',
+    body: `Calc turns the current pane into a bc-style calculator powered by math.js.
+
+<b>How it works</b>
+  Type an expression and press Enter — the result appears on the next line
+  prefixed with <b>=</b>, and the cursor moves to a new input line.
+  Variables persist for the lifetime of the pane.
+
+<b>Examples</b>
+  2 + 2                → = 4
+  x = 5                → (no output — assignment)
+  x * sin(pi / 2)      → = 5
+  sqrt(2) ^ 2          → = 2
+
+<b>Supported</b>
+  Arithmetic, trig, logarithms, complex numbers, units, matrices.
+  Lines starting with <b>#</b> are treated as comments.
+  Lines starting with <b>=</b> are result lines and are skipped.
+
+<b>Notes</b>
+  • Right-clicking Calc on an existing calc pane resets the scope.
+  • The pane tag changes to <b>calc Del</b>.
+  • Regular editor commands (Find, Replace, Save, Load) still work.`,
   },
 
   format: {
