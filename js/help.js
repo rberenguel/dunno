@@ -4,6 +4,7 @@ const SECTIONS = [
   { heading: 'Layout', items: [
     { cmd: 'New',    desc: 'Split current pane vertically' },
     { cmd: 'Newcol', desc: 'Add a new column to the right' },
+    { cmd: 'Swap',   desc: 'Toggle stacked/side-by-side with the previous pane' },
     { cmd: 'Del',    desc: 'Delete the current pane' },
   ]},
   { heading: 'File', items: [
@@ -34,6 +35,28 @@ const SECTIONS = [
 ];
 
 const TOPICS = {
+  swap: {
+    title: 'Swap',
+    body: `Swap toggles the layout relationship between the current pane and
+the previously active pane (same "current + previous" reference Diff uses).
+
+<b>Stacked → side-by-side</b>
+  If the two panes currently share a column (stacked), Swap pulls the
+  current pane out into its own new column, placed right after.
+
+<b>Side-by-side → stacked</b>
+  If the two panes are already in separate columns, Swap folds the
+  current pane into the other's column, directly below it.
+
+The pane being moved keeps its content, tag, filename, and dirty state.
+If moving a pane empties its old column, that column is removed and the
+remaining columns close the gap.
+
+<b>Usage</b>: click pane A, then click pane B, then right-click <b>Swap</b>
+inside pane B — B moves relative to A. Same click-then-right-click flow
+as Diff (click the pane to compare against, then Diff the other one).`,
+  },
+
   plot: {
     title: 'Plot',
     body: `Plot renders a gnuplot-compatible spec from the current pane,

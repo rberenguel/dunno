@@ -427,6 +427,60 @@ export function addColumn(paneId) {
   _rebuildColHandles();
 }
 
+// Toggle the relationship between the current pane and the previously active
+// pane: if they're stacked together in one column, pull the current pane out
+// into its own new column (vertical -> horizontal). If they're already in
+// separate columns, trade places exactly: each takes over the other's slot,
+// so column sizes are unchanged (horizontal -> vertical, or just reordering).
+export function swapPane(paneId) {
+  const pane = _panes.get(paneId);
+  const prev = _panes.get(_prevActiveId);
+  if (!pane || !prev || pane === prev) return;
+
+  const oldColId  = pane.colId;
+  const prevColId = prev.colId;
+
+  if (oldColId === prevColId) {
+    // Same column -> promote `pane` into its own new column.
+    const oldCol = _cols.get(oldColId);
+    oldCol.paneIds = oldCol.paneIds.filter(id => id !== paneId);
+
+    const newColId = createColumn(oldColId);
+    const newCol   = _cols.get(newColId);
+    newCol.el.appendChild(pane.el);
+    newCol.paneIds.push(paneId);
+    pane.colId = newColId;
+
+    _rebuildPaneHandles(oldColId);
+    _rebuildPaneHandles(newColId);
+    if (oldCol.paneIds.length === 0) _deleteColumn(oldColId);
+  } else {
+    // Different columns -> exchange slots exactly, no folding/merging.
+    const oldCol  = _cols.get(oldColId);
+    const prevCol = _cols.get(prevColId);
+    const oldIdx  = oldCol.paneIds.indexOf(paneId);
+    const prevIdx = prevCol.paneIds.indexOf(prev.id);
+
+    // Swap the two DOM nodes in place (classic parent/nextSibling swap).
+    const parentA = pane.el.parentNode, nextA = pane.el.nextSibling;
+    const parentB = prev.el.parentNode, nextB = prev.el.nextSibling;
+    parentB.insertBefore(pane.el, nextB);
+    parentA.insertBefore(prev.el, nextA);
+
+    oldCol.paneIds[oldIdx]   = prev.id;
+    prevCol.paneIds[prevIdx] = paneId;
+    pane.colId = prevColId;
+    prev.colId = oldColId;
+
+    _rebuildPaneHandles(oldColId);
+    _rebuildPaneHandles(prevColId);
+  }
+
+  _rebuildColHandles();
+  _setActive(paneId);
+}
+
+
 // ── Diff ───────────────────────────────────────────────────────────────────────
 
 const EDITOR_LINE_H = 14 * 1.7;

@@ -1,6 +1,6 @@
 import {
   createColumn, createPane,
-  deletePane, splitPane, addColumn, diffPane,
+  deletePane, splitPane, addColumn, swapPane, diffPane,
   getPrev, getPane, setPaneDisplay,
   getState, restoreState,
   setPaneFile, getPaneFile, clearDirty, loadContent,
@@ -34,6 +34,7 @@ function _toast(msg, durationMs = 3000) {
 register('Del',    ctx => deletePane(ctx.paneId));
 register('New',    ctx => splitPane(ctx.paneId));
 register('Newcol', ctx => addColumn(ctx.paneId));
+register('Swap',   ctx => swapPane(ctx.paneId));
 register('Diff',   ctx => diffPane(ctx.paneId));
 register('dark',   () => document.body.classList.add('dark'));
 register('light',  () => document.body.classList.remove('dark'));
