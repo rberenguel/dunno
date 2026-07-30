@@ -8,6 +8,7 @@ const SECTIONS = [
     { cmd: 'Del',    desc: 'Delete the current pane' },
     { cmd: 'Tab',    desc: 'New workspace tab' },
     { cmd: 'Deltab', desc: 'Close current workspace tab' },
+    { cmd: 'Nametab', desc: 'Rename current tab' },
     { cmd: 'Zoom',   desc: 'Toggle full-screen for this pane' },
   ]},
   { heading: 'File', items: [
@@ -36,6 +37,7 @@ const SECTIONS = [
     { cmd: 'Eval',    desc: 'Run pane as JS; stdout → split pane' },
     { cmd: 'Preview', desc: 'Render pane as Markdown → HTML' },
     { cmd: 'Format',  desc: 'Reformat pane (select a language, or infer from filename)' },
+    { cmd: 'Highlight', desc: 'Toggle Prism syntax highlighting' },
     { cmd: 'Calc',    desc: 'Turn pane into a bc-style calculator (math.js)' },
     { cmd: 'Grep',    desc: 'Search all panes in this workspace' },
     { cmd: 'Ruler',   desc: 'Toggle 80-char guide' },
@@ -75,6 +77,14 @@ automatically when you switch tabs or close the app.`,
     body: `Deltab closes the current workspace tab.
 
 The last tab cannot be closed — use 42clear to wipe everything.`,
+  },
+
+  nametab: {
+    title: 'Nametab',
+    body: `Nametab renames the current workspace tab.
+
+Select a name anywhere, then right-click Nametab.
+The tab label updates immediately and persists across sessions.`,
   },
 
   zoom: {
@@ -377,16 +387,45 @@ Supported: headings, bold/italic, code blocks, blockquotes,
   • Regular editor commands (Find, Replace, Save, Load) still work.`,
   },
 
+  highlight: {
+    title: 'Highlight',
+    body: `Highlight toggles Prism syntax highlighting for the current pane.
+
+<b>Toggle on</b>: select a language, then right-click Highlight.
+  <span class="help-cmd">js</span>   → JavaScript
+  <span class="help-cmd">ts</span>   → TypeScript
+  <span class="help-cmd">css</span>  → CSS
+  <span class="help-cmd">html</span> → HTML
+  <span class="help-cmd">json</span> → JSON
+  <span class="help-cmd">md</span>   → Markdown
+  <span class="help-cmd">yaml</span> → YAML
+  <span class="help-cmd">c</span>    → C
+  <span class="help-cmd">cpp</span>  → C++
+  <span class="help-cmd">go</span>   → Go
+  <span class="help-cmd">py</span>   → Python
+  <span class="help-cmd">sh</span>   → Bash
+  <span class="help-cmd">rs</span>   → Rust
+
+<b>Toggle off</b>: right-click Highlight with no selection (or select
+<span class="help-cmd">off</span> first).
+
+If no language is selected, Highlight infers from the filename extension.
+Shorthand aliases: cc=c++, c++=cpp, py=python, sh=bash, etc.
+
+The highlighting state persists across sessions.`,
+  },
+
   format: {
     title: 'Format',
     body: `Format reformats the current pane's content in place using Prettier.
 
 <b>Choosing a language</b>
   Select a language word first, then right-click <b>Format</b>:
-    js  jsx  javascript  css  scss  less  html  markdown  md  yaml  yml  json
+    js  jsx  mjs  cjs  ts  tsx  javascript  typescript
+    css  scss  less  html  markdown  md  yaml  yml  json
 
   No selection? Format falls back to the pane's loaded filename extension
-  (.js .jsx .mjs .cjs .css .scss .less .html .htm .md .markdown .yml .yaml .json).
+  (.js .jsx .mjs .cjs .ts .tsx .css .scss .less .html .htm .md .markdown .yml .yaml .json).
 
   Neither available → defaults to <b>markdown</b>.
 

@@ -5,7 +5,7 @@ import {
   getState, restoreState, resetLayout,
   setPaneFile, getPaneFile, clearDirty, loadContent,
   setFileDropHandler,
-  toggleLineNumbers, toggleRuler, toggleLock,
+  toggleLineNumbers, toggleRuler, toggleLock, setHighlightLang,
   getAllPanes, isAnyPaneDirty, setDirtyCallback,
 } from './tiling.js';
 import {
@@ -19,6 +19,7 @@ import {
   markDirty,
   clearTabDirty,
   isTabDirty,
+  setLabel,
   saveAll,
   importWorkspaces,
   tabCount,
@@ -29,6 +30,7 @@ import { parsePlotSpec, renderSVG } from './plot.js';
 import { openFind, openReplace } from './find.js';
 import { renderPreviewHTML } from './preview.js';
 import { formatSource, resolveParser } from './format.js';
+import { resolvePrismLang } from './highlight.js';
 import { attachCalc } from './calc.js';
 import { renderHelpHTML } from './help.js';
 import { loadVersion } from './version.js';
@@ -54,6 +56,7 @@ function _syncTabDirty() {
 function _onPaneRestored(pane, saved) {
   if (saved.isCalc) attachCalc(pane);
   if (saved.showLineNums) toggleLineNumbers(pane.id);
+  if (saved.highlightLang) setHighlightLang(pane.id, saved.highlightLang);
 }
 
 // ── Modal ───────────────────────────────────────────────────────────────────────
@@ -117,6 +120,12 @@ register('Deltab', () => {
     createPane(col);
   }
   _syncTabDirty();
+});
+register('Nametab', ctx => {
+  const name = (ctx.selection || '').trim();
+  if (!name) { _toast('Select a name first, then right-click Nametab'); return; }
+  setLabel(getActiveIndex(), name);
+  _toast('Tab: ' + name);
 });
 register('Zoom',   ctx => {
   const was = ctx.pane.el.classList.contains('zoomed');
@@ -317,6 +326,27 @@ register('Break', ctx => {
 register('Lock', ctx => {
   const on = toggleLock(ctx.paneId);
   _toast(on ? 'Pane locked' : 'Pane unlocked');
+});
+register('Highlight', ctx => {
+  const { name } = getPaneFile(ctx.paneId) ?? {};
+  const sel = (ctx.selection || '').trim().toLowerCase();
+  if (sel === 'off') {
+    setHighlightLang(ctx.paneId, null);
+    _toast('Highlight off');
+    return;
+  }
+  const lang = resolvePrismLang(sel || null, name);
+  if (!lang) {
+    if (ctx.pane.highlightLang) {
+      setHighlightLang(ctx.paneId, null);
+      _toast('Highlight off');
+    } else {
+      _toast('Select a language (e.g. js) or infer from filename');
+    }
+    return;
+  }
+  setHighlightLang(ctx.paneId, lang);
+  _toast('Highlight: ' + lang);
 });
 
 // ── Session ───────────────────────────────────────────────────────────────────

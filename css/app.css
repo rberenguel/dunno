@@ -19,6 +19,15 @@
   --diff-eq-fg:      #333333;
   --calc-result:     #1a6ea8;
   --calc-comment:    #888888;
+  --prism-bg:        #ffffff;
+  --prism-fg:        #24292e;
+  --prism-kw:        #d73a49;
+  --prism-str:       #032f62;
+  --prism-num:       #005cc5;
+  --prism-fn:        #6f42c1;
+  --prism-cmt:       #6a737d;
+  --prism-tag:       #22863a;
+  --prism-attr:      #6f42c1;
 }
 
 body.dark {
@@ -38,6 +47,15 @@ body.dark {
   --diff-eq-fg:      #aaaacc;
   --calc-result:     #7fbbe8;
   --calc-comment:    #666688;
+  --prism-bg:        #0f1020;
+  --prism-fg:        #c9d1d9;
+  --prism-kw:        #ff7b72;
+  --prism-str:       #a5d6ff;
+  --prism-num:       #79c0ff;
+  --prism-fn:        #d2a8ff;
+  --prism-cmt:       #8b949e;
+  --prism-tag:       #7ee787;
+  --prism-attr:      #d2a8ff;
 }
 
 html, body {
@@ -710,6 +728,38 @@ body.dark .help-cmd { color: #aabbff; }
   opacity: 0.5;
   font-size: 0.9em;
 }
+
+/* ── Prism syntax highlighting ───────────────────────────────────────────── */
+
+.token.keyword,
+.token.operator,
+.token.important { color: var(--prism-kw); }
+
+.token.string,
+.token.char,
+.token.regex,
+.token.attr-value { color: var(--prism-str); }
+
+.token.number,
+.token.boolean { color: var(--prism-num); }
+
+.token.function,
+.token.class-name,
+.token.attr-name { color: var(--prism-fn); }
+
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata { color: var(--prism-cmt); font-style: italic; }
+
+.token.tag,
+.token.selector { color: var(--prism-tag); }
+
+.token.punctuation,
+.token.namespace,
+.token.property,
+.token.variable,
+.token.entity { color: var(--prism-fg); opacity: 0.75; }
 
 /* ── Calc pane syntax ─────────────────────────────────────────────────────── */
 .calc-result  { color: var(--calc-result); }

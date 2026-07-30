@@ -11,9 +11,10 @@ const EXT_TO_PARSER = {
 
 // Selection word aliases -> prettier `parser` value.
 const ALIASES = {
-  js: 'babel', javascript: 'babel', jsx: 'babel',
+  js: 'babel', javascript: 'babel', jsx: 'babel', mjs: 'babel', cjs: 'babel',
+  ts: 'babel', typescript: 'babel', tsx: 'babel',
   css: 'css', scss: 'scss', less: 'less',
-  html: 'html',
+  html: 'html', htm: 'html',
   markdown: 'markdown', md: 'markdown',
   yaml: 'yaml', yml: 'yaml',
   json: 'json',

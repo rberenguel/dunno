@@ -1,6 +1,7 @@
 import { CodeJar }           from '../libs/codejar.js';
 import { isCommand, execute } from './commands.js';
 import { diffLines }          from './diff.js';
+import { makeHighlighter }    from './highlight.js';
 
 let _id = 0;
 const uid = () => String(++_id);
@@ -150,6 +151,16 @@ export function toggleLock(paneId) {
   pane.editorEl.contentEditable = pane.locked ? 'false' : 'true';
   pane.lockEl.hidden = !pane.locked;
   return pane.locked;
+}
+
+export function setHighlightLang(paneId, lang) {
+  const pane = _panes.get(paneId);
+  if (!pane) return false;
+  pane.highlightLang = lang;
+  if (lang && window.Prism) {
+    pane.jar.updateCode(pane.jar.toString());
+  }
+  return true;
 }
 
 // ── Context menu ───────────────────────────────────────────────────────────────
@@ -414,12 +425,21 @@ export function createPane(colId, content = '', tagText = null) {
     pane.lineNumEl.innerHTML = Array.from({ length: lines }, (_, i) => `<div>${i + 1}</div>`).join('');
   }
 
-  _suppressDirtyFor.add(id);
-  const jar = CodeJar(editorEl, el => {
-    if (!_suppressDirtyFor.has(id)) _markDirty(id);
-    if (_extraHighlight) _extraHighlight(el);
+  function _doHighlight(editor, _pos) {
+    if (pane && pane.highlightLang && window.Prism) {
+      const grammar = window.Prism.languages[pane.highlightLang];
+      if (grammar) {
+        const text = editor.textContent;
+        const html = window.Prism.highlight(text, grammar, pane.highlightLang);
+        editor.innerHTML = html;
+      }
+    }
+    if (_extraHighlight) _extraHighlight(editor);
     if (pane && pane.showLineNums) _updateLineNumbers();
-  }, { tab: '  ', preserveIdent: true, addClosing: false, catchTab: true, history: true });
+  }
+
+  _suppressDirtyFor.add(id);
+  const jar = CodeJar(editorEl, _doHighlight, { tab: '  ', preserveIdent: true, addClosing: false, catchTab: true, history: true });
   editorEl.style.overflowY = 'visible';
   if (content) jar.updateCode(content);
   _suppressDirtyFor.delete(id);
@@ -432,6 +452,7 @@ export function createPane(colId, content = '', tagText = null) {
   _addLongPress(bodyEl,   id);
   tagBarEl.addEventListener('mousedown',   () => _setActive(id));
   editorEl.addEventListener('mousedown',   () => _setActive(id));
+  editorEl.addEventListener('input',       () => { if (!_suppressDirtyFor.has(id)) _markDirty(id); });
 
   bodyEl.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
   bodyEl.addEventListener('drop', e => {
@@ -447,6 +468,7 @@ export function createPane(colId, content = '', tagText = null) {
     dirty: false, fileHandle: null, filename: null,
     plotOutputId: null, evalOutputId: null,
     showLineNums: false, showRuler: false, fontSize: null, locked: false,
+    highlightLang: null,
     setHighlight: fn => { _extraHighlight = fn; },
   };
   _panes.set(id, pane);
@@ -646,6 +668,7 @@ export function getState() {
       showRuler: pane.showRuler || false,
       fontSize:  pane.fontSize || null,
       locked:    pane.locked || false,
+      highlightLang: pane.highlightLang || null,
     };
   }
   return state;
@@ -690,6 +713,9 @@ export function restoreState(state, onPaneRestored) {
         pane.locked = true;
         pane.editorEl.contentEditable = 'false';
         pane.lockEl.hidden = false;
+      }
+      if (p.highlightLang) {
+        pane.highlightLang = p.highlightLang;
       }
       if (onPaneRestored) onPaneRestored(pane, p);
     }
