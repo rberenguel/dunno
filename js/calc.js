@@ -1,6 +1,22 @@
 // ── Calc — bc-style calculator pane ───────────────────────────────────────────
 // Each line is evaluated by math.js on Enter; results appear as "= value" lines.
-// Variables persist within the pane's lifetime.
+// Variables persist within the pane's lifetime. `ans` holds the last result.
+
+function _esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function _calcHighlight(el) {
+  const lines = el.textContent.split('\n');
+  el.innerHTML = lines.map((line, i) => {
+    const nl = i < lines.length - 1 ? '\n' : '';
+    if (line.startsWith('= ') || line === '=')
+      return `<span class="calc-result">${_esc(line)}</span>${nl}`;
+    if (line.startsWith('#'))
+      return `<span class="calc-comment">${_esc(line)}</span>${nl}`;
+    return _esc(line) + nl;
+  }).join('');
+}
 
 export function attachCalc(pane) {
   if (pane.isCalc) {
@@ -10,6 +26,7 @@ export function attachCalc(pane) {
   pane.isCalc = true;
   pane.calcParser = window.math.parser();
   pane.tagEl.textContent = 'calc Del';
+  pane.setHighlight(_calcHighlight);
 
   pane.editorEl.addEventListener('keydown', e => {
     if (e.key !== 'Enter') return;
@@ -32,18 +49,22 @@ export function attachCalc(pane) {
     let result;
     try {
       const val = pane.calcParser.evaluate(line);
-      result = (val !== undefined && typeof val !== 'function')
-        ? window.math.format(val, { precision: 14 })
-        : null;
+      if (val !== undefined && typeof val !== 'function') {
+        pane.calcParser.set('ans', val); // math.js 15 doesn't auto-set ans
+        result = window.math.format(val, { precision: 14 });
+      } else {
+        result = null;
+      }
     } catch (err) {
       result = '! ' + err.message;
     }
 
     const resultLine = '\n= ' + (result ?? '(no value)');
+
     let newText, newCursor;
     if (nlIdx === -1) {
       newText   = text + resultLine + '\n';
-      newCursor = newText.length; // will be fixed by guard below
+      newCursor = newText.length;
     } else {
       newText   = text.slice(0, nlIdx) + resultLine + text.slice(nlIdx);
       newCursor = nlIdx + resultLine.length + 1;

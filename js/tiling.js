@@ -16,6 +16,9 @@ const _suppressDirtyFor = new Set();
 
 const _layout = () => document.getElementById('layout');
 
+let _dirtyCb = null;
+export function setDirtyCallback(fn) { _dirtyCb = fn; }
+
 // Capture selection on right-mousedown before the browser collapses it.
 let _rightClickSel = null;
 
@@ -101,6 +104,54 @@ export const getPrev     = () => _panes.get(_prevActiveId);
 export const getPane     = id => _panes.get(id);
 export const getActiveId = () => _activeId;
 
+export function getAllPanes() {
+  return Array.from(_panes.values()).filter(p => !p.transient);
+}
+
+export function isAnyPaneDirty() {
+  for (const p of _panes.values()) if (p.dirty) return true;
+  return false;
+}
+
+export function resetLayout() {
+  _layout().innerHTML = '';
+  _cols.clear();
+  _panes.clear();
+  _colOrder = [];
+  _activeId = null;
+  _prevActiveId = null;
+}
+
+export function toggleLineNumbers(paneId) {
+  const pane = _panes.get(paneId);
+  if (!pane) return false;
+  pane.showLineNums = !pane.showLineNums;
+  pane.el.classList.toggle('show-nums', pane.showLineNums);
+  pane.lineNumEl.hidden = !pane.showLineNums;
+  if (pane.showLineNums) {
+    const lines = pane.jar.toString().split('\n').length;
+    pane.lineNumEl.innerHTML = Array.from({ length: lines }, (_, i) => `<div>${i + 1}</div>`).join('');
+  }
+  return pane.showLineNums;
+}
+
+export function toggleRuler(paneId) {
+  const pane = _panes.get(paneId);
+  if (!pane) return false;
+  pane.showRuler = !pane.showRuler;
+  pane.el.classList.toggle('show-ruler', pane.showRuler);
+  return pane.showRuler;
+}
+
+export function toggleLock(paneId) {
+  const pane = _panes.get(paneId);
+  if (!pane) return false;
+  pane.locked = !pane.locked;
+  pane.editorEl.contentEditable = pane.locked ? 'false' : 'true';
+  pane.lockEl.hidden = !pane.locked;
+  return pane.locked;
+}
+
 // ── Context menu ───────────────────────────────────────────────────────────────
 
 const _reEdSub = /^s(.)(.+?)\1(.*?)\1([gi]*)$/;
@@ -139,6 +190,7 @@ function _markDirty(paneId) {
   if (!pane || pane.dirty) return;
   pane.dirty = true;
   pane.dirtyEl.hidden = false;
+  if (_dirtyCb) _dirtyCb(paneId);
 }
 
 export function clearDirty(paneId) {
@@ -146,6 +198,7 @@ export function clearDirty(paneId) {
   if (!pane) return;
   pane.dirty = false;
   pane.dirtyEl.hidden = true;
+  if (_dirtyCb) _dirtyCb(paneId);
 }
 
 export function setPaneFile(paneId, handle, name) {
@@ -324,6 +377,11 @@ export function createPane(colId, content = '', tagText = null) {
   dirtyEl.textContent = '·';
   dirtyEl.hidden     = true;
 
+  const lockEl = document.createElement('span');
+  lockEl.className = 'pane-lock';
+  lockEl.textContent = '🔒';
+  lockEl.hidden = true;
+
   tagEl.className       = 'pane-tag';
   tagEl.contentEditable = 'true';
   tagEl.spellcheck      = false;
@@ -333,18 +391,34 @@ export function createPane(colId, content = '', tagText = null) {
   bodyEl.className   = 'pane-body';
   editorEl.className = 'editor';
 
+  const lineNumEl = document.createElement('div');
+  lineNumEl.className = 'line-gutter';
+  lineNumEl.hidden = true;
+
   bodyEl.appendChild(editorEl);
+  bodyEl.appendChild(lineNumEl);
   tagBarEl.appendChild(filenameEl);
   tagBarEl.appendChild(dirtyEl);
+  tagBarEl.appendChild(lockEl);
   tagBarEl.appendChild(tagEl);
   el.appendChild(tagBarEl);
   el.appendChild(bodyEl);
   col.el.appendChild(el);
   col.paneIds.push(id);
 
+  let _extraHighlight = null;
+  let pane = null;
+
+  function _updateLineNumbers() {
+    const lines = pane.jar.toString().split('\n').length;
+    pane.lineNumEl.innerHTML = Array.from({ length: lines }, (_, i) => `<div>${i + 1}</div>`).join('');
+  }
+
   _suppressDirtyFor.add(id);
-  const jar = CodeJar(editorEl, () => {
+  const jar = CodeJar(editorEl, el => {
     if (!_suppressDirtyFor.has(id)) _markDirty(id);
+    if (_extraHighlight) _extraHighlight(el);
+    if (pane && pane.showLineNums) _updateLineNumbers();
   }, { tab: '  ', preserveIdent: true, addClosing: false, catchTab: true, history: true });
   editorEl.style.overflowY = 'visible';
   if (content) jar.updateCode(content);
@@ -367,12 +441,15 @@ export function createPane(colId, content = '', tagText = null) {
     if (file && _fileDropHandler) _fileDropHandler(id, file);
   });
 
-  _panes.set(id, {
-    id, colId, el, tagBarEl, filenameEl, dirtyEl, tagEl, bodyEl, editorEl, jar,
+  pane = {
+    id, colId, el, tagBarEl, filenameEl, dirtyEl, lockEl, tagEl, bodyEl, editorEl, jar, lineNumEl,
     mode: 'edit', savedContent: null,
     dirty: false, fileHandle: null, filename: null,
     plotOutputId: null, evalOutputId: null,
-  });
+    showLineNums: false, showRuler: false, fontSize: null, locked: false,
+    setHighlight: fn => { _extraHighlight = fn; },
+  };
+  _panes.set(id, pane);
   _setActive(id);
   return id;
 }
@@ -535,6 +612,7 @@ export function diffPane(paneId) {
 export function setPaneDisplay(paneId, html) {
   const pane = _panes.get(paneId);
   if (!pane) return;
+  pane.transient = true;
   pane.editorEl.style.display = 'none';
   let el = pane.bodyEl.querySelector('.pane-display');
   if (!el) {
@@ -549,26 +627,35 @@ export function setPaneDisplay(paneId, html) {
 
 export function getState() {
   const state = { colOrder: [..._colOrder], cols: {}, panes: {} };
-  for (const [id, col] of _cols)
-    state.cols[id] = {
-      paneIds:   [...col.paneIds],
-      flexBasis: col.el.style.flexBasis || null,
-    };
-  for (const [id, pane] of _panes)
+  for (const [id, col] of _cols) {
+    const paneIds = col.paneIds.filter(pid => !_panes.get(pid)?.transient);
+    if (paneIds.length === 0) continue;
+    state.cols[id] = { paneIds, flexBasis: col.el.style.flexBasis || null };
+  }
+  state.colOrder = state.colOrder.filter(id => state.cols[id]);
+  for (const [id, pane] of _panes) {
+    if (pane.transient) continue;
     state.panes[id] = {
       colId:     pane.colId,
       tag:       pane.tagEl.textContent,
       content:   pane.mode === 'diff' ? (pane.savedContent ?? '') : pane.jar.toString(),
       filename:  pane.filename || null,
       flexBasis: pane.el.style.flexBasis || null,
+      isCalc:    pane.isCalc || false,
+      showLineNums: pane.showLineNums || false,
+      showRuler: pane.showRuler || false,
+      fontSize:  pane.fontSize || null,
+      locked:    pane.locked || false,
     };
+  }
   return state;
 }
 
-export function restoreState(state) {
+export function restoreState(state, onPaneRestored) {
   _layout().innerHTML = '';
   _cols.clear(); _panes.clear();
   _colOrder = []; _activeId = null; _prevActiveId = null;
+  if (!state || !state.colOrder) return;
 
   for (const colId of state.colOrder) {
     const colData = state.cols[colId];
@@ -591,6 +678,20 @@ export function restoreState(state) {
         pane.filenameEl.hidden = false;
       }
       clearDirty(newPaneId);
+      if (p.fontSize) {
+        pane.fontSize = p.fontSize;
+        pane.editorEl.style.fontSize = p.fontSize + 'px';
+      }
+      if (p.showRuler) {
+        pane.showRuler = true;
+        pane.el.classList.add('show-ruler');
+      }
+      if (p.locked) {
+        pane.locked = true;
+        pane.editorEl.contentEditable = 'false';
+        pane.lockEl.hidden = false;
+      }
+      if (onPaneRestored) onPaneRestored(pane, p);
     }
     _rebuildPaneHandles(newColId);
   }

@@ -10,6 +10,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
+  --tab-h:         28px;
   --tag-bg:        #dde3ff;
   --tag-bg-active: #b8c4ff;
   --tag-fg:        #000000;
@@ -25,6 +26,8 @@
   --diff-ins-gutter: #33aa33;
   --diff-ins-word:   #ccffcc;
   --diff-eq-fg:      #333333;
+  --calc-result:     #1a6ea8;
+  --calc-comment:    #888888;
 }
 
 body.dark {
@@ -42,6 +45,8 @@ body.dark {
   --diff-ins-gutter: #44aa44;
   --diff-ins-word:   #204a20;
   --diff-eq-fg:      #aaaacc;
+  --calc-result:     #7fbbe8;
+  --calc-comment:    #666688;
 }
 
 html, body {
@@ -54,10 +59,87 @@ html, body {
 #layout {
   display: flex;
   flex-direction: row;
-  height: 100vh;
+  height: calc(100vh - var(--tab-h));
   width: 100vw;
   overflow: hidden;
 }
+
+/* ── Tab bar ────────────────────────────────────────────── */
+
+#tab-bar {
+  display: flex;
+  align-items: stretch;
+  height: var(--tab-h);
+  background: var(--tag-bg);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  z-index: 50;
+}
+
+.tab-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.5rem 0 0.65rem;
+  min-width: 80px;
+  max-width: 180px;
+  cursor: pointer;
+  border-right: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tag-fg);
+  opacity: 0.6;
+  user-select: none;
+  flex-shrink: 0;
+  transition: background 0.1s, opacity 0.1s;
+}
+
+.tab-item:hover { background: var(--tag-bg-active); opacity: 1; }
+
+.tab-item.active {
+  background: var(--body-bg);
+  opacity: 1;
+  box-shadow: inset 0 -2px 0 var(--tag-bg-active);
+}
+
+.tab-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-dirty {
+  font-size: 7px;
+  color: #ff8844;
+  flex-shrink: 0;
+  line-height: 1;
+  display: none;
+}
+
+.tab-item.is-dirty .tab-dirty { display: block; }
+
+.tab-close {
+  flex-shrink: 0;
+  opacity: 0;
+  background: transparent;
+  border: none;
+  color: var(--tag-fg);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  line-height: 1;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: opacity 0.1s;
+}
+
+.tab-item:hover .tab-close { opacity: 0.6; }
+.tab-close:hover { opacity: 1 !important; background: var(--tag-bg); }
 
 /* ── Columns ────────────────────────────────────────────── */
 
@@ -181,6 +263,134 @@ html, body {
   word-break: break-word;
   color: var(--tag-fg);
   overflow-y: visible !important;
+}
+
+/* ── Line numbers ───────────────────────────────────────── */
+
+.line-gutter {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 40px;
+  padding: 14px 6px 0 0;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--tag-fg);
+  opacity: 0.25;
+  pointer-events: none;
+  user-select: none;
+  z-index: 3;
+}
+
+.pane.show-nums .editor {
+  padding-left: 52px;
+}
+
+/* ── Ruler (80-char guide) ──────────────────────────────── */
+
+.pane.show-ruler .editor {
+  background-image: linear-gradient(to right,
+    transparent calc(14px + 80ch),
+    var(--border) calc(14px + 80ch),
+    var(--border) calc(14px + 80ch + 1px),
+    transparent calc(14px + 80ch + 1px)
+  );
+}
+.pane.show-nums.show-ruler .editor {
+  background-image: linear-gradient(to right,
+    transparent calc(52px + 80ch),
+    var(--border) calc(52px + 80ch),
+    var(--border) calc(52px + 80ch + 1px),
+    transparent calc(52px + 80ch + 1px)
+  );
+}
+
+/* ── Lock ───────────────────────────────────────────────── */
+
+.pane-lock {
+  display: flex;
+  align-items: center;
+  padding: 3px 6px 3px 0;
+  font-size: 12px;
+  user-select: none;
+  cursor: default;
+  opacity: 0.5;
+}
+
+.pane-lock[hidden] {
+  display: none;
+}
+
+.pane.locked .editor {
+  opacity: 0.55;
+}
+
+/* ── Modal ──────────────────────────────────────────────── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+}
+
+.modal-overlay.hidden { display: none; }
+
+.modal-box {
+  background: var(--body-bg);
+  border: 1px solid var(--border);
+  padding: 24px 28px;
+  min-width: 300px;
+  max-width: 90vw;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--tag-fg);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+.modal-box p { margin: 0 0 20px; line-height: 1.5; }
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal-actions button {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  background: var(--tag-bg);
+  color: var(--tag-fg);
+  cursor: pointer;
+}
+.modal-actions button:hover { background: var(--tag-bg-active); }
+
+/* ── Zoom ───────────────────────────────────────────────── */
+
+.pane.zoomed {
+  position: fixed;
+  top: var(--tab-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 200;
+  box-shadow: 0 0 0 2px var(--tag-bg-active);
+}
+
+.pane.zoomed .pane-tag-bar::after {
+  content: '⤢';
+  margin-left: auto;
+  padding: 3px 8px;
+  font-size: 12px;
+  opacity: 0.5;
+  user-select: none;
 }
 
 /* ── Display pane (plot output etc.) ───────────────────── */
@@ -437,6 +647,15 @@ body.dark .preview-content a { color: #88aaff; }
   font-size: 13px;
   line-height: 1.6;
   color: var(--tag-fg);
+  columns: 280px;
+  column-gap: 28px;
+}
+
+.help-content h2,
+.help-inspiration,
+.help-tip {
+  column-span: all;
+  -webkit-column-span: all;
 }
 
 .help-content h2 {
@@ -452,7 +671,10 @@ body.dark .preview-content a { color: #88aaff; }
   margin: -0.8em 0 1.4em;
 }
 
-.help-section { margin-bottom: 1.2em; }
+.help-section {
+  margin-bottom: 1.2em;
+  break-inside: avoid;
+}
 
 .help-section h3 {
   font-size: 0.78em;
@@ -498,10 +720,24 @@ body.dark .help-cmd { color: #aabbff; }
   font-size: 0.9em;
 }
 
+/* ── Calc pane syntax ─────────────────────────────────────────────────────── */
+.calc-result  { color: var(--calc-result); }
+.calc-comment { color: var(--calc-comment); }
+
 </style>
 </head>
 <body class="dark">
+  <div id="tab-bar"></div>
   <div id="layout"></div>
+  <div id="modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <p id="modal-msg">Unsaved changes — close anyway?</p>
+      <div class="modal-actions">
+        <button id="modal-cancel">Cancel</button>
+        <button id="modal-confirm">Close</button>
+      </div>
+    </div>
+  </div>
   <script>
 /**
  * marked v11.0.0 - a markdown parser
@@ -3397,6 +3633,9 @@ const _suppressDirtyFor = new Set();
 
 const _layout = () => document.getElementById('layout');
 
+let _dirtyCb = null;
+function setDirtyCallback(fn) { _dirtyCb = fn; }
+
 // Capture selection on right-mousedown before the browser collapses it.
 let _rightClickSel = null;
 
@@ -3482,6 +3721,54 @@ const getPrev     = () => _panes.get(_prevActiveId);
 const getPane     = id => _panes.get(id);
 const getActiveId = () => _activeId;
 
+function getAllPanes() {
+  return Array.from(_panes.values()).filter(p => !p.transient);
+}
+
+function isAnyPaneDirty() {
+  for (const p of _panes.values()) if (p.dirty) return true;
+  return false;
+}
+
+function resetLayout() {
+  _layout().innerHTML = '';
+  _cols.clear();
+  _panes.clear();
+  _colOrder = [];
+  _activeId = null;
+  _prevActiveId = null;
+}
+
+function toggleLineNumbers(paneId) {
+  const pane = _panes.get(paneId);
+  if (!pane) return false;
+  pane.showLineNums = !pane.showLineNums;
+  pane.el.classList.toggle('show-nums', pane.showLineNums);
+  pane.lineNumEl.hidden = !pane.showLineNums;
+  if (pane.showLineNums) {
+    const lines = pane.jar.toString().split('\n').length;
+    pane.lineNumEl.innerHTML = Array.from({ length: lines }, (_, i) => `<div>${i + 1}</div>`).join('');
+  }
+  return pane.showLineNums;
+}
+
+function toggleRuler(paneId) {
+  const pane = _panes.get(paneId);
+  if (!pane) return false;
+  pane.showRuler = !pane.showRuler;
+  pane.el.classList.toggle('show-ruler', pane.showRuler);
+  return pane.showRuler;
+}
+
+function toggleLock(paneId) {
+  const pane = _panes.get(paneId);
+  if (!pane) return false;
+  pane.locked = !pane.locked;
+  pane.editorEl.contentEditable = pane.locked ? 'false' : 'true';
+  pane.lockEl.hidden = !pane.locked;
+  return pane.locked;
+}
+
 // ── Context menu ───────────────────────────────────────────────────────────────
 
 const _reEdSub = /^s(.)(.+?)\1(.*?)\1([gi]*)$/;
@@ -3520,6 +3807,7 @@ function _markDirty(paneId) {
   if (!pane || pane.dirty) return;
   pane.dirty = true;
   pane.dirtyEl.hidden = false;
+  if (_dirtyCb) _dirtyCb(paneId);
 }
 
 function clearDirty(paneId) {
@@ -3527,6 +3815,7 @@ function clearDirty(paneId) {
   if (!pane) return;
   pane.dirty = false;
   pane.dirtyEl.hidden = true;
+  if (_dirtyCb) _dirtyCb(paneId);
 }
 
 function setPaneFile(paneId, handle, name) {
@@ -3705,6 +3994,11 @@ function createPane(colId, content = '', tagText = null) {
   dirtyEl.textContent = '·';
   dirtyEl.hidden     = true;
 
+  const lockEl = document.createElement('span');
+  lockEl.className = 'pane-lock';
+  lockEl.textContent = '🔒';
+  lockEl.hidden = true;
+
   tagEl.className       = 'pane-tag';
   tagEl.contentEditable = 'true';
   tagEl.spellcheck      = false;
@@ -3714,18 +4008,34 @@ function createPane(colId, content = '', tagText = null) {
   bodyEl.className   = 'pane-body';
   editorEl.className = 'editor';
 
+  const lineNumEl = document.createElement('div');
+  lineNumEl.className = 'line-gutter';
+  lineNumEl.hidden = true;
+
   bodyEl.appendChild(editorEl);
+  bodyEl.appendChild(lineNumEl);
   tagBarEl.appendChild(filenameEl);
   tagBarEl.appendChild(dirtyEl);
+  tagBarEl.appendChild(lockEl);
   tagBarEl.appendChild(tagEl);
   el.appendChild(tagBarEl);
   el.appendChild(bodyEl);
   col.el.appendChild(el);
   col.paneIds.push(id);
 
+  let _extraHighlight = null;
+  let pane = null;
+
+  function _updateLineNumbers() {
+    const lines = pane.jar.toString().split('\n').length;
+    pane.lineNumEl.innerHTML = Array.from({ length: lines }, (_, i) => `<div>${i + 1}</div>`).join('');
+  }
+
   _suppressDirtyFor.add(id);
-  const jar = CodeJar(editorEl, () => {
+  const jar = CodeJar(editorEl, el => {
     if (!_suppressDirtyFor.has(id)) _markDirty(id);
+    if (_extraHighlight) _extraHighlight(el);
+    if (pane && pane.showLineNums) _updateLineNumbers();
   }, { tab: '  ', preserveIdent: true, addClosing: false, catchTab: true, history: true });
   editorEl.style.overflowY = 'visible';
   if (content) jar.updateCode(content);
@@ -3748,12 +4058,15 @@ function createPane(colId, content = '', tagText = null) {
     if (file && _fileDropHandler) _fileDropHandler(id, file);
   });
 
-  _panes.set(id, {
-    id, colId, el, tagBarEl, filenameEl, dirtyEl, tagEl, bodyEl, editorEl, jar,
+  pane = {
+    id, colId, el, tagBarEl, filenameEl, dirtyEl, lockEl, tagEl, bodyEl, editorEl, jar, lineNumEl,
     mode: 'edit', savedContent: null,
     dirty: false, fileHandle: null, filename: null,
     plotOutputId: null, evalOutputId: null,
-  });
+    showLineNums: false, showRuler: false, fontSize: null, locked: false,
+    setHighlight: fn => { _extraHighlight = fn; },
+  };
+  _panes.set(id, pane);
   _setActive(id);
   return id;
 }
@@ -3916,6 +4229,7 @@ function diffPane(paneId) {
 function setPaneDisplay(paneId, html) {
   const pane = _panes.get(paneId);
   if (!pane) return;
+  pane.transient = true;
   pane.editorEl.style.display = 'none';
   let el = pane.bodyEl.querySelector('.pane-display');
   if (!el) {
@@ -3930,26 +4244,35 @@ function setPaneDisplay(paneId, html) {
 
 function getState() {
   const state = { colOrder: [..._colOrder], cols: {}, panes: {} };
-  for (const [id, col] of _cols)
-    state.cols[id] = {
-      paneIds:   [...col.paneIds],
-      flexBasis: col.el.style.flexBasis || null,
-    };
-  for (const [id, pane] of _panes)
+  for (const [id, col] of _cols) {
+    const paneIds = col.paneIds.filter(pid => !_panes.get(pid)?.transient);
+    if (paneIds.length === 0) continue;
+    state.cols[id] = { paneIds, flexBasis: col.el.style.flexBasis || null };
+  }
+  state.colOrder = state.colOrder.filter(id => state.cols[id]);
+  for (const [id, pane] of _panes) {
+    if (pane.transient) continue;
     state.panes[id] = {
       colId:     pane.colId,
       tag:       pane.tagEl.textContent,
       content:   pane.mode === 'diff' ? (pane.savedContent ?? '') : pane.jar.toString(),
       filename:  pane.filename || null,
       flexBasis: pane.el.style.flexBasis || null,
+      isCalc:    pane.isCalc || false,
+      showLineNums: pane.showLineNums || false,
+      showRuler: pane.showRuler || false,
+      fontSize:  pane.fontSize || null,
+      locked:    pane.locked || false,
     };
+  }
   return state;
 }
 
-function restoreState(state) {
+function restoreState(state, onPaneRestored) {
   _layout().innerHTML = '';
   _cols.clear(); _panes.clear();
   _colOrder = []; _activeId = null; _prevActiveId = null;
+  if (!state || !state.colOrder) return;
 
   for (const colId of state.colOrder) {
     const colData = state.cols[colId];
@@ -3972,10 +4295,178 @@ function restoreState(state) {
         pane.filenameEl.hidden = false;
       }
       clearDirty(newPaneId);
+      if (p.fontSize) {
+        pane.fontSize = p.fontSize;
+        pane.editorEl.style.fontSize = p.fontSize + 'px';
+      }
+      if (p.showRuler) {
+        pane.showRuler = true;
+        pane.el.classList.add('show-ruler');
+      }
+      if (p.locked) {
+        pane.locked = true;
+        pane.editorEl.contentEditable = 'false';
+        pane.lockEl.hidden = false;
+      }
+      if (onPaneRestored) onPaneRestored(pane, p);
     }
     _rebuildPaneHandles(newColId);
   }
   _rebuildColHandles();
+}
+
+
+// ── tabs.js ──
+
+const KEY = 'dunno-session';
+
+let _meta = [];    // [{ label, dirty }]
+let _states = [];  // [state | null]
+let _active = 0;
+let _tabBarEl = null;
+let _onSwitch = null;
+let _onClose = null;
+
+function init({ onSwitch, onClose }) {
+  _onSwitch = onSwitch;
+  _onClose = onClose;
+  _tabBarEl = document.getElementById('tab-bar');
+
+  const saved = _load();
+  if (saved && saved.version === 2) {
+    _meta = (saved.workspaces || []).map(w => ({ label: w.label || 'untitled', dirty: w.dirty || false }));
+    _states = (saved.workspaces || []).map(w => w.state || null);
+    _active = saved.activeIndex || 0;
+    if (_active >= _meta.length) _active = 0;
+  } else {
+    const oldRaw = localStorage.getItem('dunno-state');
+    let state = null;
+    if (oldRaw) {
+      try { state = JSON.parse(oldRaw); } catch {}
+    }
+    _meta = [{ label: 'untitled', dirty: false }];
+    _states = [state];
+    _active = 0;
+  }
+  _render();
+  return _states[_active] ?? null;
+}
+
+function tabCount() { return _meta.length; }
+function getActiveIndex() { return _active; }
+
+function createTab() {
+  _meta.push({ label: `untitled ${_meta.length + 1}`, dirty: false });
+  _states.push(null);
+  _active = _meta.length - 1;
+  _render();
+}
+
+function closeTab(idx) {
+  if (_meta.length <= 1) return false;
+  _meta.splice(idx, 1);
+  _states.splice(idx, 1);
+  if (idx < _active) _active--;
+  else if (_active >= _meta.length) _active = _meta.length - 1;
+  _render();
+  return true;
+}
+
+function switchTab(idx) {
+  if (idx === _active) return;
+  _active = idx;
+  _render();
+}
+
+function saveActiveState(state) {
+  if (_active >= 0 && _active < _states.length) {
+    _states[_active] = state;
+  }
+}
+
+function getActiveState() {
+  return _states[_active] ?? null;
+}
+
+function getAllStates() {
+  return _states.map((state, i) => ({ index: i, label: _meta[i]?.label || 'untitled', state })).filter(s => s.state);
+}
+
+function markDirty() {
+  if (_active >= 0 && _active < _meta.length) {
+    _meta[_active].dirty = true;
+    _render();
+  }
+}
+
+function clearTabDirty() {
+  if (_active >= 0 && _active < _meta.length) {
+    _meta[_active].dirty = false;
+    _render();
+  }
+}
+
+function isTabDirty(idx) {
+  return idx >= 0 && idx < _meta.length ? _meta[idx].dirty : false;
+}
+
+function setLabel(idx, label) {
+  if (idx >= 0 && idx < _meta.length) {
+    _meta[idx].label = label;
+    _render();
+  }
+}
+
+function saveAll() {
+  try {
+    const workspaces = _meta.map((m, i) => ({ ...m, state: _states[i] }));
+    localStorage.setItem(KEY, JSON.stringify({ version: 2, workspaces, activeIndex: _active }));
+    localStorage.removeItem('dunno-state');
+  } catch {}
+}
+
+function importWorkspaces(workspaces, activeIndex = 0) {
+  _meta = workspaces.map(w => ({ label: w.label || 'imported', dirty: w.dirty || false }));
+  _states = workspaces.map(w => w.state || null);
+  _active = Math.min(activeIndex, _meta.length - 1);
+  saveAll();
+  _render();
+}
+
+function _render() {
+  if (!_tabBarEl) return;
+  _tabBarEl.innerHTML = '';
+  _meta.forEach((m, idx) => {
+    const tab = document.createElement('div');
+    tab.className = 'tab-item' + (idx === _active ? ' active' : '') + (m.dirty ? ' is-dirty' : '');
+    tab.title = m.label;
+    tab.innerHTML = `
+      <span class="tab-title">${_esc(m.label)}</span>
+      <span class="tab-dirty">·</span>
+      <span class="tab-close">×</span>
+    `;
+    tab.addEventListener('click', e => {
+      if (e.target.closest('.tab-close')) {
+        e.stopPropagation();
+        if (_onClose) _onClose(idx);
+      } else {
+        if (_onSwitch) _onSwitch(idx);
+      }
+    });
+    _tabBarEl.appendChild(tab);
+  });
+}
+
+function _esc(s) {
+  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function _load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
 }
 
 
@@ -4512,7 +5003,23 @@ async function formatSource(source, parser) {
 
 // ── Calc — bc-style calculator pane ───────────────────────────────────────────
 // Each line is evaluated by math.js on Enter; results appear as "= value" lines.
-// Variables persist within the pane's lifetime.
+// Variables persist within the pane's lifetime. `ans` holds the last result.
+
+function _esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function _calcHighlight(el) {
+  const lines = el.textContent.split('\n');
+  el.innerHTML = lines.map((line, i) => {
+    const nl = i < lines.length - 1 ? '\n' : '';
+    if (line.startsWith('= ') || line === '=')
+      return `<span class="calc-result">${_esc(line)}</span>${nl}`;
+    if (line.startsWith('#'))
+      return `<span class="calc-comment">${_esc(line)}</span>${nl}`;
+    return _esc(line) + nl;
+  }).join('');
+}
 
 function attachCalc(pane) {
   if (pane.isCalc) {
@@ -4522,6 +5029,7 @@ function attachCalc(pane) {
   pane.isCalc = true;
   pane.calcParser = window.math.parser();
   pane.tagEl.textContent = 'calc Del';
+  pane.setHighlight(_calcHighlight);
 
   pane.editorEl.addEventListener('keydown', e => {
     if (e.key !== 'Enter') return;
@@ -4544,18 +5052,22 @@ function attachCalc(pane) {
     let result;
     try {
       const val = pane.calcParser.evaluate(line);
-      result = (val !== undefined && typeof val !== 'function')
-        ? window.math.format(val, { precision: 14 })
-        : null;
+      if (val !== undefined && typeof val !== 'function') {
+        pane.calcParser.set('ans', val); // math.js 15 doesn't auto-set ans
+        result = window.math.format(val, { precision: 14 });
+      } else {
+        result = null;
+      }
     } catch (err) {
       result = '! ' + err.message;
     }
 
     const resultLine = '\n= ' + (result ?? '(no value)');
+
     let newText, newCursor;
     if (nlIdx === -1) {
       newText   = text + resultLine + '\n';
-      newCursor = newText.length; // will be fixed by guard below
+      newCursor = newText.length;
     } else {
       newText   = text.slice(0, nlIdx) + resultLine + text.slice(nlIdx);
       newCursor = nlIdx + resultLine.length + 1;
@@ -4574,7 +5086,7 @@ function attachCalc(pane) {
 // ── version.js ──
 
 // Sentinel replaced by bundle.go at weave time; fetched from manifest at runtime.
-let VERSION = '0.3.1';
+let VERSION = '0.5.0';
 
 async function loadVersion() {
   try {
@@ -4595,6 +5107,9 @@ const SECTIONS = [
     { cmd: 'Newcol', desc: 'Add a new column to the right' },
     { cmd: 'Swap',   desc: 'Toggle stacked/side-by-side with the previous pane' },
     { cmd: 'Del',    desc: 'Delete the current pane' },
+    { cmd: 'Tab',    desc: 'New workspace tab' },
+    { cmd: 'Deltab', desc: 'Close current workspace tab' },
+    { cmd: 'Zoom',   desc: 'Toggle full-screen for this pane' },
   ]},
   { heading: 'File', items: [
     { cmd: 'Load', desc: 'Open a file into this pane' },
@@ -4604,6 +5119,16 @@ const SECTIONS = [
   { heading: 'Edit', items: [
     { cmd: 'Find',    desc: 'Search in this pane' },
     { cmd: 'Replace', desc: 'Find & replace in this pane' },
+    { cmd: 'Nums',    desc: 'Toggle line numbers' },
+    { cmd: 'Now',     desc: 'Insert ISO timestamp at cursor' },
+    { cmd: 'Copy',    desc: 'Copy pane body to clipboard' },
+    { cmd: 'Sort',    desc: 'Sort lines (select num or column)' },
+    { cmd: 'Trim',    desc: 'Strip trailing whitespace' },
+    { cmd: 'Lower',   desc: 'To lowercase' },
+    { cmd: 'Upper',   desc: 'To uppercase' },
+    { cmd: 'Title',   desc: 'Title-case words' },
+    { cmd: 'Unique',  desc: 'Remove duplicate lines' },
+    { cmd: 'Reverse', desc: 'Reverse line order' },
     { cmd: 's/pat/rep/g', desc: 'Select an ed substitute, right-click anywhere to apply' },
   ]},
   { heading: 'View', items: [
@@ -4613,10 +5138,20 @@ const SECTIONS = [
     { cmd: 'Preview', desc: 'Render pane as Markdown → HTML' },
     { cmd: 'Format',  desc: 'Reformat pane (select a language, or infer from filename)' },
     { cmd: 'Calc',    desc: 'Turn pane into a bc-style calculator (math.js)' },
+    { cmd: 'Grep',    desc: 'Search all panes in this workspace' },
+    { cmd: 'Ruler',   desc: 'Toggle 80-char guide' },
+    { cmd: 'Big',     desc: 'Increase font size' },
+    { cmd: 'Small',   desc: 'Decrease font size' },
   ]},
   { heading: 'Theme', items: [
     { cmd: 'dark',  desc: 'Switch to dark theme' },
     { cmd: 'light', desc: 'Switch to light theme' },
+  ]},
+  { heading: 'Session', items: [
+    { cmd: 'Export', desc: 'Dump all workspaces as JSON' },
+    { cmd: 'Import', desc: 'Restore workspace(s) from JSON' },
+    { cmd: 'Break',  desc: 'Split pane content at cursor' },
+    { cmd: 'Lock',   desc: 'Toggle read-only for this pane' },
   ]},
   { heading: 'Keyboard', items: [
     { cmd: '⌘S / Ctrl+S', desc: 'Save session to localStorage' },
@@ -4624,6 +5159,184 @@ const SECTIONS = [
 ];
 
 const TOPICS = {
+  tab: {
+    title: 'Tab',
+    body: `Tab creates a new workspace. Each workspace is an independent
+layout of columns and panes.
+
+The new workspace starts with a single empty pane ready for work.
+Right-click Tab again to create another.
+
+Workspaces persist across reloads. The current workspace is saved
+automatically when you switch tabs or close the app.`,
+  },
+
+  deltab: {
+    title: 'Deltab',
+    body: `Deltab closes the current workspace tab.
+
+The last tab cannot be closed — use 42clear to wipe everything.`,
+  },
+
+  zoom: {
+    title: 'Zoom',
+    body: `Zoom temporarily maximizes the current pane to fill the viewport.
+
+Right-click Zoom again to restore the normal tiled layout.
+A zoom indicator (⤢) appears in the tag bar.`,
+  },
+
+  nums: {
+    title: 'Nums',
+    body: `Nums toggles line numbers in the current pane.
+
+A subtle gutter appears on the left edge. Line numbers update
+automatically as you edit.`,
+  },
+
+  now: {
+    title: 'Now',
+    body: `Now inserts a timestamp at the cursor position.
+
+<b>Default</b> (no selection): local time
+  2026-07-30 11:27:15
+
+<b>Timezone-aware</b>: select a zone name, then right-click Now.
+  <span class="help-cmd">PST</span>  →  2026-07-30 03:27:15 PDT
+  <span class="help-cmd">UTC</span>  →  2026-07-30 18:27:15 UTC
+  <span class="help-cmd">EST</span>  →  2026-07-30 06:27:15 EDT
+
+Supported keywords:
+  PST PDT Pacific Sunnyvale
+  EST EDT Eastern
+  CST CDT Central
+  MST MDT Mountain
+  UTC GMT
+  local
+
+DST is handled automatically by the browser's Intl engine.`,
+  },
+
+  copy: {
+    title: 'Copy',
+    body: `Copy copies the entire body of the current pane to the clipboard.
+
+A toast confirms the action. Useful for grabbing a bash snippet
+to paste into a real terminal.`,
+  },
+
+  grep: {
+    title: 'Grep',
+    body: `Grep searches all panes across every workspace tab.
+
+Select a pattern, then right-click Grep. Results appear in a split
+pane showing tab name, filename, match count, and matching lines.
+
+Search is case-insensitive regex. The pattern is taken from your
+current text selection.`,
+  },
+
+  sort: {
+    title: 'Sort',
+    body: `Sort sorts the lines of the current pane in place.
+
+<b>Default</b>: alphabetical sort.
+
+<b>Numeric</b>: select <span class="help-cmd">num</span> or <span class="help-cmd">n</span>, then right-click Sort.
+
+<b>By column</b>: select a number (1-indexed), then right-click Sort.
+  <span class="help-cmd">2</span>  → sorts by the second whitespace-delimited field.
+
+Lines are sorted in-place; the original order is lost.`,
+  },
+
+  trim: {
+    title: 'Trim',
+    body: `Trim strips trailing whitespace from every line and ensures
+exactly one trailing newline at the end of the pane.`,
+  },
+
+  lower: {
+    title: 'Lower',
+    body: `Lower converts the entire pane to lowercase.`,
+  },
+
+  upper: {
+    title: 'Upper',
+    body: `Upper converts the entire pane to uppercase.`,
+  },
+
+  title: {
+    title: 'Title',
+    body: `Title converts every word to Title Case (first letter uppercase,
+rest lowercase).`,
+  },
+
+  unique: {
+    title: 'Unique',
+    body: `Unique removes duplicate lines, keeping the first occurrence.
+Line order of unique lines is preserved.`,
+  },
+
+  reverse: {
+    title: 'Reverse',
+    body: `Reverse reverses the order of all lines in the pane.`,
+  },
+
+  ruler: {
+    title: 'Ruler',
+    body: `Ruler toggles a subtle 80-character vertical guide line in the
+current pane. The line scales automatically with font size changes.`,
+  },
+
+  big: {
+    title: 'Big',
+    body: `Big increases the font size of the current pane by 2px
+(up to a maximum of 24px).`,
+  },
+
+  small: {
+    title: 'Small',
+    body: `Small decreases the font size of the current pane by 2px
+(down to a minimum of 10px).`,
+  },
+
+  break: {
+    title: 'Break',
+    body: `Break splits the current pane's content at the cursor position.
+Everything before the cursor stays in the current pane; everything
+after moves into a new pane below.`,
+  },
+
+  lock: {
+    title: 'Lock',
+    body: `Lock toggles read-only mode for the current pane.
+
+When locked, the editor dims and ignores keystrokes. Right-click
+Lock again to unlock. The lock state persists across sessions.`,
+  },
+
+  export: {
+    title: 'Export',
+    body: `Export dumps all workspace tabs as JSON into a split pane.
+
+You can save the JSON to a file, email it, or gist it. Use Import
+to restore the exact same layout later.`,
+  },
+
+  import: {
+    title: 'Import',
+    body: `Import restores workspace(s) from JSON.
+
+<b>Single workspace</b>: JSON object with colOrder / panes → imported
+into the current tab.
+
+<b>Multiple workspaces</b>: JSON array of { label, state } objects →
+replaces all tabs and reloads the page.
+
+Use Export to generate the JSON.`,
+  },
+
   swap: {
     title: 'Swap',
     body: `Swap toggles the layout relationship between the current pane and
@@ -4856,6 +5569,7 @@ function renderHelpHTML(selection) {
 
 
 
+
 // ── Toast notifications ────────────────────────────────────────────────────────
 
 function _toast(msg, durationMs = 3000) {
@@ -4870,6 +5584,42 @@ function _toast(msg, durationMs = 3000) {
   }, durationMs);
 }
 
+function _syncTabDirty() {
+  if (isAnyPaneDirty()) markDirty(); else clearTabDirty();
+}
+
+function _onPaneRestored(pane, saved) {
+  if (saved.isCalc) attachCalc(pane);
+  if (saved.showLineNums) toggleLineNumbers(pane.id);
+}
+
+// ── Modal ───────────────────────────────────────────────────────────────────────
+
+let _modalResolve = null;
+
+function _showModal(msg) {
+  const overlay = document.getElementById('modal');
+  const msgEl   = document.getElementById('modal-msg');
+  if (!overlay) return Promise.resolve(true);
+  msgEl.textContent = msg;
+  overlay.classList.remove('hidden');
+  return new Promise(resolve => { _modalResolve = resolve; });
+}
+
+function _hideModal(result) {
+  const overlay = document.getElementById('modal');
+  if (overlay) overlay.classList.add('hidden');
+  if (_modalResolve) { _modalResolve(result); _modalResolve = null; }
+}
+
+function _setupModal() {
+  document.getElementById('modal-confirm')?.addEventListener('click', () => _hideModal(true));
+  document.getElementById('modal-cancel')?.addEventListener('click', () => _hideModal(false));
+  document.getElementById('modal')?.addEventListener('click', e => {
+    if (e.target.id === 'modal') _hideModal(false);
+  });
+}
+
 // ── Layout commands ────────────────────────────────────────────────────────────
 
 register('Del',    ctx => deletePane(ctx.paneId));
@@ -4877,6 +5627,277 @@ register('New',    ctx => splitPane(ctx.paneId));
 register('Newcol', ctx => addColumn(ctx.paneId));
 register('Swap',   ctx => swapPane(ctx.paneId));
 register('Diff',   ctx => diffPane(ctx.paneId));
+register('Tab',    () => {
+  const state = getState();
+  state.dark = document.body.classList.contains('dark');
+  saveActiveState(state);
+  createTab();
+  resetLayout();
+  const col = createColumn();
+  createPane(col);
+  _syncTabDirty();
+});
+register('Deltab', () => {
+  if (tabCount() <= 1) { _toast('Cannot close the last tab'); return; }
+  const state = getState();
+  state.dark = document.body.classList.contains('dark');
+  saveActiveState(state);
+  const idx = getActiveIndex();
+  closeTab(idx);
+  resetLayout();
+  const next = getActiveState();
+  if (next) {
+    document.body.classList.toggle('dark', next.dark ?? true);
+    restoreState(next, _onPaneRestored);
+  } else {
+    const col = createColumn();
+    createPane(col);
+  }
+  _syncTabDirty();
+});
+register('Zoom',   ctx => {
+  const was = ctx.pane.el.classList.contains('zoomed');
+  document.querySelectorAll('.pane.zoomed').forEach(el => el.classList.remove('zoomed'));
+  if (!was) ctx.pane.el.classList.add('zoomed');
+});
+register('Nums',   ctx => {
+  const on = toggleLineNumbers(ctx.paneId);
+  _toast(on ? 'Line numbers on' : 'Line numbers off');
+});
+function _formatTimestamp(d, timeZone, withZoneName) {
+  const opts = {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  };
+  if (timeZone) opts.timeZone = timeZone;
+  if (withZoneName) opts.timeZoneName = 'short';
+  const parts = new Intl.DateTimeFormat('en-US', opts).formatToParts(d);
+  const get = (t) => parts.find(p => p.type === t)?.value;
+  let s = `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`;
+  const zn = get('timeZoneName');
+  if (zn) s += ` ${zn}`;
+  return s;
+}
+
+const _TZ_MAP = {
+  'pst': 'America/Los_Angeles', 'pdt': 'America/Los_Angeles',
+  'pacific': 'America/Los_Angeles', 'sunnyvale': 'America/Los_Angeles',
+  'est': 'America/New_York', 'edt': 'America/New_York',
+  'eastern': 'America/New_York',
+  'cst': 'America/Chicago', 'cdt': 'America/Chicago',
+  'central': 'America/Chicago',
+  'mst': 'America/Denver', 'mdt': 'America/Denver',
+  'mountain': 'America/Denver',
+  'utc': 'UTC', 'gmt': 'UTC',
+  'local': undefined,
+};
+
+register('Now',    ctx => {
+  const sel = (ctx.selection || '').trim().toLowerCase();
+  const tz = _TZ_MAP[sel];
+  const withName = tz !== undefined && sel !== 'local';
+  const now = _formatTimestamp(new Date(), tz, withName);
+  ctx.pane.editorEl.focus();
+  document.execCommand('insertText', false, now);
+});
+register('Copy',   async ctx => {
+  try {
+    await navigator.clipboard.writeText(ctx.pane.jar.toString());
+    _toast('Copied to clipboard');
+  } catch (e) { _toast('Copy failed'); }
+});
+register('Grep',   ctx => {
+  const pattern = ctx.selection;
+  if (!pattern) { _toast('Select a pattern first, then right-click Grep'); return; }
+  let re;
+  try { re = new RegExp(pattern, 'gi'); } catch (e) {
+    _toast('Invalid regex: ' + e.message);
+    return;
+  }
+  const results = [];
+  for (const pane of getAllPanes()) {
+    const text = pane.jar.toString();
+    const lines = text.split('\n');
+    const matches = [];
+    lines.forEach((line, idx) => {
+      re.lastIndex = 0;
+      if (re.test(line)) matches.push({ line: idx + 1, text: line.trim().slice(0, 200) });
+    });
+    if (matches.length) {
+      const label = pane.filename || `pane ${pane.id}`;
+      results.push(`${label} (${matches.length})`);
+      matches.forEach(m => results.push(`  ${m.line}: ${m.text}`));
+      results.push('');
+    }
+  }
+  const allStates = getAllStates();
+  for (const { index, label, state } of allStates) {
+    if (index === getActiveIndex()) continue;
+    if (!state.panes) continue;
+    for (const [paneId, p] of Object.entries(state.panes)) {
+      if (!p || typeof p.content !== 'string') continue;
+      const lines = p.content.split('\n');
+      const matches = [];
+      lines.forEach((line, idx) => {
+        re.lastIndex = 0;
+        if (re.test(line)) matches.push({ line: idx + 1, text: line.trim().slice(0, 200) });
+      });
+      if (matches.length) {
+        const fileLabel = p.filename || `pane ${paneId}`;
+        results.push(`[${label}] ${fileLabel} (${matches.length})`);
+        matches.forEach(m => results.push(`  ${m.line}: ${m.text}`));
+        results.push('');
+      }
+    }
+  }
+  const output = results.join('\n') || '(no matches)';
+  let outId = ctx.pane.grepOutputId;
+  if (!outId || !getPane(outId)) {
+    outId = splitPane(ctx.paneId);
+    ctx.pane.grepOutputId = outId;
+    const out = getPane(outId);
+    if (out) out.tagEl.textContent = 'grep Del';
+  }
+  getPane(outId)?.jar.updateCode(output);
+});
+
+// ── Text transforms ───────────────────────────────────────────────────────────
+
+function _sortKey(line, col) {
+  const parts = line.trim().split(/\s+/);
+  return (col > 0 && col <= parts.length) ? parts[col - 1] : line;
+}
+
+register('Sort', ctx => {
+  const sel = (ctx.selection || '').trim().toLowerCase();
+  const lines = ctx.pane.jar.toString().split('\n');
+  const numeric = sel === 'num' || sel === 'n';
+  const col = sel && !numeric ? parseInt(sel, 10) : 0;
+  const sorted = lines.slice().sort((a, b) => {
+    if (numeric) {
+      const na = parseFloat(a), nb = parseFloat(b);
+      if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    }
+    if (col > 0) return _sortKey(a, col).localeCompare(_sortKey(b, col));
+    return a.localeCompare(b);
+  });
+  ctx.pane.jar.updateCode(sorted.join('\n'));
+});
+register('Trim', ctx => {
+  let text = ctx.pane.jar.toString();
+  text = text.split('\n').map(l => l.replace(/\s+$/, '')).join('\n');
+  text = text.replace(/\n*$/, '\n');
+  ctx.pane.jar.updateCode(text);
+});
+register('Lower', ctx => { ctx.pane.jar.updateCode(ctx.pane.jar.toString().toLowerCase()); });
+register('Upper', ctx => { ctx.pane.jar.updateCode(ctx.pane.jar.toString().toUpperCase()); });
+register('Title', ctx => {
+  const text = ctx.pane.jar.toString();
+  ctx.pane.jar.updateCode(text.replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase()));
+});
+register('Unique', ctx => {
+  const seen = new Set();
+  const out = [];
+  for (const line of ctx.pane.jar.toString().split('\n')) {
+    if (!seen.has(line)) { seen.add(line); out.push(line); }
+  }
+  ctx.pane.jar.updateCode(out.join('\n'));
+});
+register('Reverse', ctx => {
+  ctx.pane.jar.updateCode(ctx.pane.jar.toString().split('\n').reverse().join('\n'));
+});
+
+// ── View ────────────────────────────────────────────────────────────────────────
+
+register('Ruler', ctx => {
+  const on = toggleRuler(ctx.paneId);
+  _toast(on ? 'Ruler on' : 'Ruler off');
+});
+register('Big', ctx => {
+  const current = parseInt(getComputedStyle(ctx.pane.editorEl).fontSize, 10) || 14;
+  const next = Math.min(current + 2, 24);
+  ctx.pane.editorEl.style.fontSize = next + 'px';
+  ctx.pane.fontSize = next;
+  _toast(`Font size ${next}px`);
+});
+register('Small', ctx => {
+  const current = parseInt(getComputedStyle(ctx.pane.editorEl).fontSize, 10) || 14;
+  const next = Math.max(current - 2, 10);
+  ctx.pane.editorEl.style.fontSize = next + 'px';
+  ctx.pane.fontSize = next;
+  _toast(`Font size ${next}px`);
+});
+
+function _caretOffset(el) {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return 0;
+  const range = sel.getRangeAt(0);
+  const pre = range.cloneRange();
+  pre.selectNodeContents(el);
+  pre.setEnd(range.endContainer, range.endOffset);
+  return pre.cloneContents().textContent.length;
+}
+
+register('Break', ctx => {
+  const text = ctx.pane.jar.toString();
+  const offset = _caretOffset(ctx.pane.editorEl);
+  const before = text.slice(0, offset);
+  const after = text.slice(offset);
+  ctx.pane.jar.updateCode(before);
+  const newId = splitPane(ctx.paneId);
+  if (newId) {
+    loadContent(newId, after);
+    getPane(newId)?.editorEl.focus();
+  }
+});
+register('Lock', ctx => {
+  const on = toggleLock(ctx.paneId);
+  _toast(on ? 'Pane locked' : 'Pane unlocked');
+});
+
+// ── Session ───────────────────────────────────────────────────────────────────
+
+register('Export', ctx => {
+  saveActiveState(getState());
+  saveAll();
+  const all = getAllStates().map(s => ({ label: s.label, state: s.state }));
+  const json = JSON.stringify(all, null, 2);
+  let outId = ctx.pane.exportOutputId;
+  if (!outId || !getPane(outId)) {
+    outId = splitPane(ctx.paneId);
+    ctx.pane.exportOutputId = outId;
+    const out = getPane(outId);
+    if (out) out.tagEl.textContent = 'export Del';
+  }
+  getPane(outId)?.jar.updateCode(json);
+});
+register('Import', ctx => {
+  const text = ctx.pane.jar.toString().trim();
+  if (!text) { _toast('Nothing to import'); return; }
+  let data;
+  try { data = JSON.parse(text); } catch (e) {
+    _toast('Invalid JSON: ' + e.message);
+    return;
+  }
+  if (Array.isArray(data)) {
+    importWorkspaces(data.map(w => ({ label: w.label || 'imported', state: w.state })));
+    _toast('Imported ' + data.length + ' workspaces — reloading');
+    setTimeout(() => location.reload(), 600);
+  } else if (data && data.colOrder) {
+    const state = getState();
+    state.dark = document.body.classList.contains('dark');
+    saveActiveState(state);
+    saveAll();
+    resetLayout();
+    restoreState(data, _onPaneRestored);
+    _syncTabDirty();
+    _toast('Imported workspace');
+  } else {
+    _toast('Unrecognised JSON format');
+  }
+});
+
 register('dark',   () => document.body.classList.add('dark'));
 register('light',  () => document.body.classList.remove('dark'));
 
@@ -4940,7 +5961,14 @@ register('Get', async ctx => {
       clearDirty(ctx.paneId);
     } catch (e) { console.error(e); }
   } else {
-    _sessionLoad();
+    _sessionSave();
+    const state = getActiveState();
+    if (state) {
+      resetLayout();
+      document.body.classList.toggle('dark', state.dark ?? true);
+      restoreState(state, _onPaneRestored);
+      _syncTabDirty();
+    }
   }
 });
 
@@ -5076,29 +6104,27 @@ register('Plot', ctx => {
 
 // ── Persistence (session) ──────────────────────────────────────────────────────
 
-const KEY = 'dunno-state';
-
 let _clearPending = false;
-register('42clear', () => { _clearPending = true; localStorage.removeItem(KEY); location.reload(); });
+register('42clear', () => {
+  _clearPending = true;
+  localStorage.removeItem('dunno-session');
+  localStorage.removeItem('dunno-state');
+  location.reload();
+});
 
 function _sessionSave() {
   if (_clearPending) return;
   try {
     const state = getState();
     state.dark = document.body.classList.contains('dark');
-    localStorage.setItem(KEY, JSON.stringify(state));
+    saveActiveState(state);
+    saveAll();
   } catch {}
 }
 
 function _sessionLoad() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return false;
-    const state = JSON.parse(raw);
-    document.body.classList.toggle('dark', state.dark ?? true);
-    restoreState(state);
-    return true;
-  } catch { return false; }
+  // Workspace persistence is now handled by the tab system.
+  return false;
 }
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────────
@@ -5109,8 +6135,63 @@ Right-click any command word to execute it.
 Right-click Help for commands. Select a word first for topic help.`;
 
 async function _init() {
+  _setupModal();
   await loadVersion();
-  if (!_sessionLoad()) {
+
+  const activeState = init({
+    onSwitch: (idx) => {
+      const state = getState();
+      state.dark = document.body.classList.contains('dark');
+      saveActiveState(state);
+      switchTab(idx);
+      resetLayout();
+      const next = getActiveState();
+      if (next) {
+        document.body.classList.toggle('dark', next.dark ?? true);
+        restoreState(next, _onPaneRestored);
+      } else {
+        const col = createColumn();
+        createPane(col);
+      }
+      _syncTabDirty();
+    },
+    onClose: async (idx) => {
+      if (tabCount() <= 1) {
+        _toast('Cannot close the last tab');
+        return;
+      }
+      if (isTabDirty(idx)) {
+        const confirmed = await _showModal('This tab has unsaved changes. Close anyway?');
+        if (!confirmed) return;
+      }
+      const wasActive = idx === getActiveIndex();
+      if (wasActive) {
+        const state = getState();
+        state.dark = document.body.classList.contains('dark');
+        saveActiveState(state);
+      }
+      closeTab(idx);
+      if (wasActive) {
+        resetLayout();
+        const next = getActiveState();
+        if (next) {
+          document.body.classList.toggle('dark', next.dark ?? true);
+          restoreState(next, _onPaneRestored);
+        } else {
+          const col = createColumn();
+          createPane(col);
+        }
+      }
+      _syncTabDirty();
+    },
+  });
+
+  setDirtyCallback(() => _syncTabDirty());
+
+  if (activeState) {
+    document.body.classList.toggle('dark', activeState.dark ?? true);
+    restoreState(activeState, _onPaneRestored);
+  } else {
     const col = createColumn();
     createPane(col, WELCOME);
   }

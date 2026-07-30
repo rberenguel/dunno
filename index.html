@@ -10,7 +10,17 @@
   <link rel="stylesheet" href="css/app.css" />
 </head>
 <body class="dark">
+  <div id="tab-bar"></div>
   <div id="layout"></div>
+  <div id="modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <p id="modal-msg">Unsaved changes — close anyway?</p>
+      <div class="modal-actions">
+        <button id="modal-cancel">Cancel</button>
+        <button id="modal-confirm">Close</button>
+      </div>
+    </div>
+  </div>
   <script src="libs/marked.min.js"></script>
   <script src="libs/math.js"></script>
   <script src="libs/prettier/standalone.js"></script>

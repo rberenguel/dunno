@@ -1,6 +1,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
+  --tab-h:         28px;
   --tag-bg:        #dde3ff;
   --tag-bg-active: #b8c4ff;
   --tag-fg:        #000000;
@@ -16,6 +17,8 @@
   --diff-ins-gutter: #33aa33;
   --diff-ins-word:   #ccffcc;
   --diff-eq-fg:      #333333;
+  --calc-result:     #1a6ea8;
+  --calc-comment:    #888888;
 }
 
 body.dark {
@@ -33,6 +36,8 @@ body.dark {
   --diff-ins-gutter: #44aa44;
   --diff-ins-word:   #204a20;
   --diff-eq-fg:      #aaaacc;
+  --calc-result:     #7fbbe8;
+  --calc-comment:    #666688;
 }
 
 html, body {
@@ -45,10 +50,87 @@ html, body {
 #layout {
   display: flex;
   flex-direction: row;
-  height: 100vh;
+  height: calc(100vh - var(--tab-h));
   width: 100vw;
   overflow: hidden;
 }
+
+/* ── Tab bar ────────────────────────────────────────────── */
+
+#tab-bar {
+  display: flex;
+  align-items: stretch;
+  height: var(--tab-h);
+  background: var(--tag-bg);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  z-index: 50;
+}
+
+.tab-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.5rem 0 0.65rem;
+  min-width: 80px;
+  max-width: 180px;
+  cursor: pointer;
+  border-right: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tag-fg);
+  opacity: 0.6;
+  user-select: none;
+  flex-shrink: 0;
+  transition: background 0.1s, opacity 0.1s;
+}
+
+.tab-item:hover { background: var(--tag-bg-active); opacity: 1; }
+
+.tab-item.active {
+  background: var(--body-bg);
+  opacity: 1;
+  box-shadow: inset 0 -2px 0 var(--tag-bg-active);
+}
+
+.tab-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-dirty {
+  font-size: 7px;
+  color: #ff8844;
+  flex-shrink: 0;
+  line-height: 1;
+  display: none;
+}
+
+.tab-item.is-dirty .tab-dirty { display: block; }
+
+.tab-close {
+  flex-shrink: 0;
+  opacity: 0;
+  background: transparent;
+  border: none;
+  color: var(--tag-fg);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  line-height: 1;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: opacity 0.1s;
+}
+
+.tab-item:hover .tab-close { opacity: 0.6; }
+.tab-close:hover { opacity: 1 !important; background: var(--tag-bg); }
 
 /* ── Columns ────────────────────────────────────────────── */
 
@@ -172,6 +254,134 @@ html, body {
   word-break: break-word;
   color: var(--tag-fg);
   overflow-y: visible !important;
+}
+
+/* ── Line numbers ───────────────────────────────────────── */
+
+.line-gutter {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 40px;
+  padding: 14px 6px 0 0;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--tag-fg);
+  opacity: 0.25;
+  pointer-events: none;
+  user-select: none;
+  z-index: 3;
+}
+
+.pane.show-nums .editor {
+  padding-left: 52px;
+}
+
+/* ── Ruler (80-char guide) ──────────────────────────────── */
+
+.pane.show-ruler .editor {
+  background-image: linear-gradient(to right,
+    transparent calc(14px + 80ch),
+    var(--border) calc(14px + 80ch),
+    var(--border) calc(14px + 80ch + 1px),
+    transparent calc(14px + 80ch + 1px)
+  );
+}
+.pane.show-nums.show-ruler .editor {
+  background-image: linear-gradient(to right,
+    transparent calc(52px + 80ch),
+    var(--border) calc(52px + 80ch),
+    var(--border) calc(52px + 80ch + 1px),
+    transparent calc(52px + 80ch + 1px)
+  );
+}
+
+/* ── Lock ───────────────────────────────────────────────── */
+
+.pane-lock {
+  display: flex;
+  align-items: center;
+  padding: 3px 6px 3px 0;
+  font-size: 12px;
+  user-select: none;
+  cursor: default;
+  opacity: 0.5;
+}
+
+.pane-lock[hidden] {
+  display: none;
+}
+
+.pane.locked .editor {
+  opacity: 0.55;
+}
+
+/* ── Modal ──────────────────────────────────────────────── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+}
+
+.modal-overlay.hidden { display: none; }
+
+.modal-box {
+  background: var(--body-bg);
+  border: 1px solid var(--border);
+  padding: 24px 28px;
+  min-width: 300px;
+  max-width: 90vw;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--tag-fg);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+.modal-box p { margin: 0 0 20px; line-height: 1.5; }
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal-actions button {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  background: var(--tag-bg);
+  color: var(--tag-fg);
+  cursor: pointer;
+}
+.modal-actions button:hover { background: var(--tag-bg-active); }
+
+/* ── Zoom ───────────────────────────────────────────────── */
+
+.pane.zoomed {
+  position: fixed;
+  top: var(--tab-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 200;
+  box-shadow: 0 0 0 2px var(--tag-bg-active);
+}
+
+.pane.zoomed .pane-tag-bar::after {
+  content: '⤢';
+  margin-left: auto;
+  padding: 3px 8px;
+  font-size: 12px;
+  opacity: 0.5;
+  user-select: none;
 }
 
 /* ── Display pane (plot output etc.) ───────────────────── */
@@ -428,6 +638,15 @@ body.dark .preview-content a { color: #88aaff; }
   font-size: 13px;
   line-height: 1.6;
   color: var(--tag-fg);
+  columns: 280px;
+  column-gap: 28px;
+}
+
+.help-content h2,
+.help-inspiration,
+.help-tip {
+  column-span: all;
+  -webkit-column-span: all;
 }
 
 .help-content h2 {
@@ -443,7 +662,10 @@ body.dark .preview-content a { color: #88aaff; }
   margin: -0.8em 0 1.4em;
 }
 
-.help-section { margin-bottom: 1.2em; }
+.help-section {
+  margin-bottom: 1.2em;
+  break-inside: avoid;
+}
 
 .help-section h3 {
   font-size: 0.78em;
@@ -488,3 +710,7 @@ body.dark .help-cmd { color: #aabbff; }
   opacity: 0.5;
   font-size: 0.9em;
 }
+
+/* ── Calc pane syntax ─────────────────────────────────────────────────────── */
+.calc-result  { color: var(--calc-result); }
+.calc-comment { color: var(--calc-comment); }
