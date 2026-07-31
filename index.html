@@ -48,8 +48,10 @@
   <script src="libs/prism/prism-rust.min.js"></script>
   <script type="module" src="js/main.js"></script>
   <script>
-    if ('serviceWorker' in navigator)
-      navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
+    try {
+      if ('serviceWorker' in navigator)
+        navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {});
+    } catch {}
   </script>
 </body>
 </html>

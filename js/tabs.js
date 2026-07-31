@@ -1,5 +1,20 @@
 const KEY = 'dunno-session';
 
+// Storage access can throw synchronously — not just quota errors, but a
+// hard SecurityError in any context where storage is disabled (Claude's
+// artifact preview sandbox, private-browsing with storage blocked, etc).
+// Every read/write goes through these so the app degrades to an in-memory,
+// non-persistent session instead of crashing on load.
+function _storageGet(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function _storageSet(key, val) {
+  try { localStorage.setItem(key, val); } catch {}
+}
+function _storageRemove(key) {
+  try { localStorage.removeItem(key); } catch {}
+}
+
 let _meta = [];    // [{ label, dirty }]
 let _states = [];  // [state | null]
 let _active = 0;
@@ -19,7 +34,7 @@ export function init({ onSwitch, onClose }) {
     _active = saved.activeIndex || 0;
     if (_active >= _meta.length) _active = 0;
   } else {
-    const oldRaw = localStorage.getItem('dunno-state');
+    const oldRaw = _storageGet('dunno-state');
     let state = null;
     if (oldRaw) {
       try { state = JSON.parse(oldRaw); } catch {}
@@ -98,11 +113,9 @@ export function setLabel(idx, label) {
 }
 
 export function saveAll() {
-  try {
-    const workspaces = _meta.map((m, i) => ({ ...m, state: _states[i] }));
-    localStorage.setItem(KEY, JSON.stringify({ version: 2, workspaces, activeIndex: _active }));
-    localStorage.removeItem('dunno-state');
-  } catch {}
+  const workspaces = _meta.map((m, i) => ({ ...m, state: _states[i] }));
+  _storageSet(KEY, JSON.stringify({ version: 2, workspaces, activeIndex: _active }));
+  _storageRemove('dunno-state');
 }
 
 export function importWorkspaces(workspaces, activeIndex = 0) {
@@ -142,9 +155,7 @@ function _esc(s) {
 }
 
 function _load() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch { return null; }
+  const raw = _storageGet(KEY);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
 }

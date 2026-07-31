@@ -4,7 +4,7 @@
   "version": "0.7.0",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#dde3ff",
+  "background_color": "#0f1020",
+  "theme_color": "#0f1020",
   "icons": []
 }

@@ -600,8 +600,10 @@ register('Plot', ctx => {
 let _clearPending = false;
 register('42clear', () => {
   _clearPending = true;
-  localStorage.removeItem('dunno-session');
-  localStorage.removeItem('dunno-state');
+  try {
+    localStorage.removeItem('dunno-session');
+    localStorage.removeItem('dunno-state');
+  } catch {}
   location.reload();
 });
 
