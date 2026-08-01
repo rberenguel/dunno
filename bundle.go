@@ -280,7 +280,7 @@ func injectCSP(html string) string {
 
 	metaTag := fmt.Sprintf(`  <meta http-equiv="Content-Security-Policy" content="%s" />`+"\n", csp)
 
-	reCharset := regexp.MustCompile(`(<meta charset="UTF-8"\s*/?>\n)`)
+	reCharset := regexp.MustCompile(`(<meta charset="UTF-8" />\n)`)
 	if reCharset.MatchString(html) {
 		return reCharset.ReplaceAllString(html, "${1}"+strings.ReplaceAll(metaTag, "$", "$$"))
 	}

@@ -783,7 +783,7 @@ body {
 </head>
 <body>
 ${slots.map(t => `<div class="slot"><div class="slot-inner">${t}</div></div>`).join('\n')}
-<script>
+__SCRIPT__
 window.addEventListener('load', () => {
   document.querySelectorAll('.slot').forEach(slot => {
     const inner = slot.querySelector('.slot-inner');
@@ -799,11 +799,12 @@ window.addEventListener('load', () => {
     }
   });
 });
-<\/script>
+__SCRIPT_END__
 </body>
 </html>`;
 
-    const blob = new Blob([html], { type: 'text/html' });
+    const finalHtml = html.replace(/__SCRIPT__/g, '<' + 'script>').replace(/__SCRIPT_END__/g, '<' + '/script>');
+    const blob = new Blob([finalHtml], { type: 'text/html' });
     const url  = URL.createObjectURL(blob);
     window.open(url, '_blank');
   } catch (e) {
