@@ -31,6 +31,7 @@ import { openFind, openReplace } from './find.js';
 import { renderPreviewHTML } from './preview.js';
 import { formatSource, resolveParser } from './format.js';
 import { resolvePrismLang } from './highlight.js';
+import { parseRecipe, buildTable, exportToCanvas } from './recipe.js';
 import { attachCalc } from './calc.js';
 import { renderHelpHTML } from './help.js';
 import { loadVersion } from './version.js';
@@ -311,7 +312,7 @@ function _caretOffset(el) {
   return pre.cloneContents().textContent.length;
 }
 
-register('Break', ctx => {
+register('Split', ctx => {
   const text = ctx.pane.jar.toString();
   const offset = _caretOffset(ctx.pane.editorEl);
   const before = text.slice(0, offset);
@@ -428,7 +429,7 @@ register('Save', async ctx => {
     await _writeToHandle(ctx.paneId, handle);
   } else if (window.showSaveFilePicker) {
     try {
-      const h = await window.showSaveFilePicker({ suggestedName: 'untitled.txt' });
+      const h = await window.showSaveFilePicker({ suggestedName: 'untitled.md' });
       await _writeToHandle(ctx.paneId, h);
       setPaneFile(ctx.paneId, h, h.name ?? 'untitled.txt');
     } catch (e) {
@@ -595,10 +596,225 @@ register('Plot', ctx => {
   setPaneDisplay(outId, svg);
 });
 
+// ── Recipe ────────────────────────────────────────────────────────────────────
+
+register('Recipe', ctx => {
+  const md      = ctx.pane.jar.toString();
+  const recipes = md.split(/(?=^# )/m).map(s => s.trim()).filter(Boolean);
+
+  if (recipes.length === 0) {
+    _toast('No recipe structure found — see Help for syntax');
+    return;
+  }
+
+  let tables;
+  try {
+    tables = recipes.map(r => buildTable(parseRecipe(r)));
+  } catch (e) {
+    _toast('Recipe parse error: ' + e.message);
+    return;
+  }
+
+  let outId = ctx.pane.recipeOutputId;
+  if (!outId || !getPane(outId)) {
+    outId = splitPane(ctx.paneId);
+    ctx.pane.recipeOutputId = outId;
+    const out = getPane(outId);
+    if (out) {
+      out.tagEl.textContent = 'Png Del';
+      out.recipeSourceId = ctx.paneId;
+    }
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'recipe-display';
+  tables.forEach(t => wrap.appendChild(t));
+  setPaneDisplay(outId, wrap.outerHTML);
+});
+
+register('Png', ctx => {
+  const sourceId = ctx.pane.recipeSourceId;
+  const src = sourceId ? getPane(sourceId) : null;
+  if (!src) { _toast('Png: no recipe source pane (run Recipe first)'); return; }
+  const md      = src.jar.toString();
+  const recipes = md.split(/(?=^# )/m).map(s => s.trim()).filter(Boolean);
+  if (recipes.length === 0) { _toast('Png: no recipes found'); return; }
+
+  document.fonts.ready.then(async () => {
+    try {
+      const files = await Promise.all(recipes.map(recipeMd => {
+        const recipe   = parseRecipe(recipeMd);
+        const canvas   = exportToCanvas(recipe);
+        const slug     = (recipe.title || 'recipe').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'recipe';
+        const filename = slug + '.png';
+        return new Promise(res => canvas.toBlob(b => res(new File([b], filename, { type: 'image/png' })), 'image/png'));
+      }));
+
+      if (window.showSaveFilePicker) {
+        for (const file of files) {
+          try {
+            const handle = await window.showSaveFilePicker({
+              suggestedName: file.name,
+              types: [{ description: 'PNG image', accept: { 'image/png': ['.png'] } }],
+            });
+            const writable = await handle.createWritable();
+            await writable.write(file);
+            await writable.close();
+          } catch (e) {
+            if (e.name !== 'AbortError') _toast('Save error: ' + e.message);
+          }
+        }
+      } else if (navigator.canShare?.({ files })) {
+        navigator.share({ files })
+          .catch(e => { if (e.name !== 'AbortError') _toast('Share error: ' + e.message); });
+      } else {
+        for (const file of files) {
+          const url = URL.createObjectURL(file);
+          const a = document.createElement('a');
+          a.download = file.name;
+          a.href = url;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+      }
+    } catch (e) {
+      _toast('Png export error: ' + e.message);
+    }
+  });
+});
+
+// ── Sheet ─────────────────────────────────────────────────────────────────────
+
+register('Sheet', ctx => {
+  const md      = ctx.pane.jar.toString();
+  const recipes = md.split(/(?=^# )/m).map(s => s.trim()).filter(Boolean).slice(0, 4);
+
+  if (recipes.length === 0) {
+    _toast('Sheet: no recipes found — start each recipe with # Title');
+    return;
+  }
+
+  try {
+    const slots = recipes.map(recipeMd =>
+      buildTable(parseRecipe(recipeMd)).outerHTML
+    );
+    // Pad to 4 slots so the grid is always 2×2.
+    while (slots.length < 4) slots.push('');
+
+    const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Recipe Sheet</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+@page { size: landscape; margin: 0; }
+
+body {
+  padding: 0.5cm;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  background: white;
+}
+
+.slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px dashed #ccc;
+}
+
+.slot-inner { transform-origin: center center; }
+
+@media print {
+  .slot { border: none; }
+}
+
+/* ── Recipe table ── */
+.recipe-table {
+  border-collapse: collapse;
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+}
+.recipe-table td {
+  border: 1px solid #555;
+  padding: 5px 9px;
+  vertical-align: middle;
+  line-height: 1.35;
+  color: #111;
+}
+.recipe-table .title-row td {
+  text-align: center;
+  font-size: 14px;
+  font-weight: bold;
+  color: #000;
+}
+.recipe-table .prep-row td {
+  text-align: center;
+  color: #444;
+  font-style: italic;
+}
+.recipe-table .cell-ingredient { white-space: nowrap; }
+.recipe-table .cell-ingredient .prep-label {
+  font-style: italic;
+  margin-right: 4px;
+  opacity: .75;
+}
+.recipe-table .cell-action,
+.recipe-table .cell-finish {
+  font-weight: bold;
+  min-width: 26px;
+  padding: 4px 2px;
+  text-align: center;
+}
+.recipe-table .cell-action span,
+.recipe-table .cell-finish span {
+  display: inline-block;
+  writing-mode: vertical-rl;
+  white-space: pre-line;
+}
+</style>
+</head>
+<body>
+${slots.map(t => `<div class="slot"><div class="slot-inner">${t}</div></div>`).join('\n')}
+<script>
+window.addEventListener('load', () => {
+  document.querySelectorAll('.slot').forEach(slot => {
+    const inner = slot.querySelector('.slot-inner');
+    if (!inner || !inner.firstChild) return;
+    const r  = inner.getBoundingClientRect();
+    const sW = slot.clientWidth, sH = slot.clientHeight;
+    const s0  = Math.min(sW / r.width,  sH / r.height);
+    const s90 = Math.min(sW / r.height, sH / r.width);
+    if (s90 > s0) {
+      inner.style.transform = \`rotate(90deg) scale(\${s90})\`;
+    } else {
+      inner.style.transform = \`scale(\${s0})\`;
+    }
+  });
+});
+<\/script>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url  = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  } catch (e) {
+    _toast('Sheet error: ' + e.message);
+  }
+});
+
 // ── Persistence (session) ──────────────────────────────────────────────────────
 
 let _clearPending = false;
-register('42clear', () => {
+register('nuke', () => {
   _clearPending = true;
   try {
     localStorage.removeItem('dunno-session');

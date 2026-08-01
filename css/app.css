@@ -28,6 +28,11 @@
   --prism-cmt:       #6a737d;
   --prism-tag:       #22863a;
   --prism-attr:      #6f42c1;
+  --rec-bg:          #f8f8ff;
+  --rec-border:      #9999bb;
+  --rec-fg:          #111122;
+  --rec-title:       #000000;
+  --rec-prep:        #555577;
 }
 
 body.dark {
@@ -56,6 +61,11 @@ body.dark {
   --prism-cmt:       #8b949e;
   --prism-tag:       #7ee787;
   --prism-attr:      #d2a8ff;
+  --rec-bg:          #1e2040;
+  --rec-border:      #6666aa;
+  --rec-fg:          #ccccee;
+  --rec-title:       #ffffff;
+  --rec-prep:        #9999cc;
 }
 
 html, body {
@@ -592,9 +602,10 @@ body.dark {
 .preview-content ol  { margin: 0.6em 0 0.6em 1.8em; }
 .preview-content li  { margin: 0.25em 0; }
 
-.preview-content a { color: #6688ee; text-decoration: none; }
+a { color: #0c0; }
+.preview-content a { color: #0c0; text-decoration: none; }
 .preview-content a:hover { text-decoration: underline; }
-body.dark .preview-content a { color: #88aaff; }
+body.dark .preview-content a { color: #0c0; }
 
 .preview-content code {
   font-family: var(--font-mono);
@@ -711,8 +722,11 @@ body.dark .help-cmd { color: #aabbff; }
 
 .help-topic-body {
   white-space: pre-wrap;
+  font-family: var(--font-mono);
   line-height: 1.7;
   opacity: 0.9;
+  column-span: all;
+  -webkit-column-span: all;
 }
 
 .help-version {
@@ -764,3 +778,62 @@ body.dark .help-cmd { color: #aabbff; }
 /* ── Calc pane syntax ─────────────────────────────────────────────────────── */
 .calc-result  { color: var(--calc-result); }
 .calc-comment { color: var(--calc-comment); }
+
+/* ── Recipe table ─────────────────────────────────────────────────────────── */
+.recipe-display { overflow: auto; padding: 8px; }
+.recipe-display .recipe-table + .recipe-table { margin-top: 16px; }
+
+.recipe-table {
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  background: var(--rec-bg);
+  border: 2px solid var(--rec-border);
+}
+
+.recipe-table th,
+.recipe-table td {
+  border: 1px solid var(--rec-border);
+  padding: 5px 9px;
+  vertical-align: middle;
+  line-height: 1.35;
+  color: var(--rec-fg);
+  background: var(--rec-bg);
+}
+
+.recipe-table .title-row td {
+  text-align: center;
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--rec-title);
+}
+
+.recipe-table .prep-row td {
+  text-align: center;
+  color: var(--rec-prep);
+  font-style: italic;
+}
+
+.recipe-table .cell-ingredient { white-space: nowrap; }
+
+.recipe-table .cell-ingredient .prep-label {
+  font-style: italic;
+  margin-right: 4px;
+  opacity: .75;
+}
+
+.recipe-table .cell-action,
+.recipe-table .cell-finish {
+  font-weight: bold;
+  min-width: 26px;
+  padding: 4px 2px;
+  text-align: center;
+  color: var(--rec-title);
+}
+
+.recipe-table .cell-action span,
+.recipe-table .cell-finish span {
+  display: inline-block;
+  writing-mode: vertical-rl;
+  white-space: pre-line;
+}

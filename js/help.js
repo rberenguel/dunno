@@ -36,6 +36,8 @@ const SECTIONS = [
     { cmd: 'Plot',    desc: 'Render gnuplot spec (prev pane as data)' },
     { cmd: 'Eval',    desc: 'Run pane as JS; stdout → split pane' },
     { cmd: 'Preview', desc: 'Render pane as Markdown → HTML' },
+    { cmd: 'Recipe',  desc: 'Render recipe Markdown as flowchart table' },
+    { cmd: 'Sheet',   desc: 'Open up to 4 recipes as a printable A4 HTML sheet' },
     { cmd: 'Format',  desc: 'Reformat pane (select a language, or infer from filename)' },
     { cmd: 'Highlight', desc: 'Toggle Prism syntax highlighting' },
     { cmd: 'Calc',    desc: 'Turn pane into a bc-style calculator (math.js)' },
@@ -51,7 +53,7 @@ const SECTIONS = [
   { heading: 'Session', items: [
     { cmd: 'Export', desc: 'Dump all workspaces as JSON' },
     { cmd: 'Import', desc: 'Restore workspace(s) from JSON' },
-    { cmd: 'Break',  desc: 'Split pane content at cursor' },
+    { cmd: 'Split',  desc: 'Split pane content at cursor' },
     { cmd: 'Lock',   desc: 'Toggle read-only for this pane' },
   ]},
   { heading: 'Keyboard', items: [
@@ -76,7 +78,7 @@ automatically when you switch tabs or close the app.`,
     title: 'Deltab',
     body: `Deltab closes the current workspace tab.
 
-The last tab cannot be closed — use 42clear to wipe everything.`,
+The last tab cannot be closed — use nuke to wipe everything.`,
   },
 
   nametab: {
@@ -210,9 +212,9 @@ current pane. The line scales automatically with font size changes.`,
 (down to a minimum of 10px).`,
   },
 
-  break: {
-    title: 'Break',
-    body: `Break splits the current pane's content at the cursor position.
+  split: {
+    title: 'Split',
+    body: `Split splits the current pane's content at the cursor position.
 Everything before the cursor stays in the current pane; everything
 after moves into a new pane below.`,
   },
@@ -439,6 +441,86 @@ The highlighting state persists across sessions.`,
   • Not in the default tag bar; type <b>Format</b> into a pane's tag bar
     once, same as Diff / Preview / Eval / Plot.
   • TypeScript is not supported (parser omitted to keep bundle size down).`,
+  },
+
+  recipe: {
+    title: 'Recipe',
+    body: `Recipe renders the current pane as a flowchart-style recipe table,
+inspired by <a href="https://www.cookingforengineers.com/" target="_blank">cookingforengineers.com</a>.
+Ingredients flow left → right through action steps into finishing steps.
+
+Right-click <b>Recipe</b> — a split pane below shows the table.
+Right-click <b>Recipe</b> again on the same source pane to refresh it.
+Right-click <b>Png</b> in the output pane's tag bar to export a black-on-white PNG.
+
+<b>Syntax</b>
+  <span class="help-cmd"># Title</span>           recipe title (bold, full-width row)
+  <span class="help-cmd">&gt; prep step</span>      blockquote = global prep instruction (italic, full-width)
+  <span class="help-cmd">## action</span>         root action column (## depth 1, ### depth 2, …)
+  plain line         ingredient leaf under the current heading
+  <span class="help-cmd">verb: ingredient</span>  prep-labelled ingredient (verb shown in italic)
+  <span class="help-cmd">1. finish step</span>    ordered list = rightmost finishing column(s)
+
+Use <span class="help-cmd">\\n</span> or <span class="help-cmd">&lt;br/&gt;</span> in any heading or list item to produce
+multiple vertical text columns (wider cell, not taller).
+
+<b>Example — Brownie</b>
+<pre># Brownie (20×20 cm pan)
+
+&gt; Butter and flour a 20×20 cm pan
+&gt; Preheat oven to 170°C
+
+## fold in
+### mix
+#### mix
+##### melt
+115 g unsalted butter
+#### 200 g sugar
+#### 2.5 mL vanilla extract
+#### 60 mL fresh brewed espresso or very strong coffee
+### lightly beat: 2 large eggs
+## 80 g all-purpose flour
+## 80 g Hershey's cocoa powder
+## 1.3 g baking soda
+## 1.5 g table salt
+
+1. bake 170°C for 30 to 40 min</pre>
+
+<b>Example — Sunflower Seed Crackers</b>
+<pre># Sunflower Seed Crackers
+
+## thorough mix
+### add
+1/2 tbsp honey
+#### add
+75 ml olive oil
+100 ml water
+##### mix dry
+150 g white flour
+2.5 pinches of salt
+sunflower seeds to taste
+
+1. lay on parchment
+2. press flat 3–3.5 mm
+3. mark thumb-sized cuts
+4. bake 160°C until golden</pre>`,
+  },
+
+  sheet: {
+    title: 'Sheet',
+    body: `Sheet splits the current pane at <span class="help-cmd">#</span> headings, renders up to 4 recipes,
+and composes them into a single printable A4 landscape card (300 dpi PNG).
+
+<b>Workflow</b>
+  1. Put up to 4 recipes in one pane, each starting with <span class="help-cmd"># Title</span>.
+  2. Right-click Sheet — done.
+
+Or use Split to split a pane first, then Sheet each individually.
+
+Each recipe is scaled and optionally rotated 90° to fill its slot as large
+as possible. Slots are arranged 2×2; the browser handles scaling at full quality.
+Fewer than 4 recipes leave the remaining slots blank; the card size stays fixed.
+Print from the new tab — use landscape orientation and 0.5 cm margins.`,
   },
 
   find: {
