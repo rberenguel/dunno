@@ -111,7 +111,11 @@ function buildLayoutCells(recipe) {
         type: 'action',
       });
       let childRow = startRow;
-      for (const child of node.children) {
+      // In bottom-up recipes a nested sub-recipe (taller tree) is usually
+      // the chronologically earlier step; place it first so it appears
+      // higher in the layout while keeping original order among ties.
+      const sortedChildren = node.children.slice().sort((a, b) => calcHeight(b) - calcHeight(a));
+      for (const child of sortedChildren) {
         place(child, childRow, h);
         childRow += calcRowspan(child);
       }
