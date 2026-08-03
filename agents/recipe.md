@@ -4,7 +4,7 @@
 > pioneered by [cookingforengineers.com](https://www.cookingforengineers.com/),
 > where ingredients flow left→right through action steps into finishing steps.
 
-This document describes the Markdown dialect used by the Recipe Flowchart app.
+This document describes the recipe dialect used by the Recipe Flowchart app.
 When a user asks you to write a recipe in this format, produce a Markdown file
 following the rules below. The app parses it and renders a flowchart-style grid
 table where ingredients flow left→right through action steps.
@@ -19,15 +19,15 @@ table where ingredients flow left→right through action steps.
 > Prep step 1
 > Prep step 2
 
-## root action
-### child action
-#### deeper action
+N. final action
+N-1. earlier action
+N-2. even earlier action
 plain ingredient line
-#### another ingredient at this depth
-### ingredient at shallower depth
+plain ingredient line
 
-1. Finishing step A
-2. Finishing step B
+---
+Finishing step A
+Finishing step B
 ```
 
 ---
@@ -36,7 +36,7 @@ plain ingredient line
 
 ### `# Title` — Recipe title
 One `#` heading. Appears as the top-most row of the rendered table, spanning
-the full width. Required for a clean export.
+the full width.
 
 ```
 # Banana Nut Bread (about 10 servings)
@@ -57,107 +57,87 @@ Multiple `>` lines produce multiple rows.
 
 ---
 
-### `## … ######` — Action nodes (the flowchart steps)
-Headings at depth 2–6 define the action columns of the table.
-- **Depth 2 (`##`)** = the root action (rightmost column in the grid).
-- **Depth 3 (`###`)** = child of depth 2.
-- **Depth 4 (`####`)** = child of depth 3. And so on.
+### `N. action` — Action nodes (the flowchart steps)
+Lines starting with a number and a dot define action columns.
 
-A heading at depth N is automatically a child of the most recent heading at
-depth N−1. You never need to indent — the `#` count encodes the tree.
+**Higher N = closer to the final dish = rightward in the table.**
+**Lower N = earlier in cooking = leftward (closer to raw ingredients).**
+
+Think of N as the cooking-order step number: you melt butter first (low N),
+fold everything together last (high N).
+
+An `N.` node is automatically a child of the most recent line with a higher
+number above it. You never need to indent — the number encodes the tree.
 
 ```
-## fold
-### mash until smooth
-#### melt
+4. fold in
+3. mix
+2. mix
+1. melt
 ```
 
-This produces three nested action columns: `melt` → `mash until smooth` → `fold`.
+This produces four nested action columns: `melt` → `mix` → `mix` → `fold in`.
+
+Numbers do not need to be consecutive — any values work as long as the relative
+ordering is preserved. `2. melt`, `5. mix`, `10. fold in` is equivalent to
+`1. melt`, `2. mix`, `3. fold in`.
 
 **Line breaks inside an action label** use `\n` or `<br/>`.
 Each break adds a new vertical text column inside the cell (making it wider,
-not taller):
-
-```
-1. bake 350°F (170°C)\n30 to 40 min
-```
+not taller).
 
 ---
 
 ### Plain paragraph lines — Ingredients (leaf nodes)
-Any plain text line (not a heading, not a blockquote, not a list item) is an
-**ingredient**. It belongs to the most recent heading above it.
+Any plain text line (not a heading, not a blockquote, not a numbered action)
+is an **ingredient**. It belongs to the most recent `N.` action above it.
 
 ```
-### mix
-150 g white flour
-2.5 pinches of salt
-sunflower seeds to taste
+2. mix
+1. melt
+115 g unsalted butter
+1. 200 g sugar
+1. 2.5 mL vanilla extract
 ```
 
-Most ingredients are plain lines. Multiple lines under the same heading are
-siblings — each occupies one row, and the heading's action cell spans all of them.
+Here `115 g unsalted butter` belongs to `1. melt` (the nearest action above it).
+`200 g sugar` and `vanilla` are written as `1.` nodes — making them siblings of
+`1. melt`, so they attach directly to `2. mix` without their own sub-action.
 
-**Ingredient lines are raw materials only.** Do not append preparation states
-to them. Never write `1 onion, diced` or `2 eggs, lightly beaten` — the prep
-action belongs in the heading, not the ingredient. The ingredient line is just
-the raw quantity: `1 onion`, `2 eggs`.
+**An `N.` node with no children is a leaf ingredient**, not an action step. Use
+this pattern whenever an ingredient goes directly into a parent action without
+any named preparation of its own. The rule is: an `N.` node becomes a child of
+the most recent action with a higher number above it, regardless of whether it
+ends up having children or not.
 
-**Plain text attaches to the most recent heading — not the nearest ancestor.**
-After deep nesting, the "most recent heading" is the deepest one still open, not
-the root action. If you write:
-
+**Inline prep label** — optional prefix `verb: ingredient`:
 ```
-## stir in
-### blend smooth
-#### simmer
-plain text here   ← attaches to #### simmer, NOT ## stir in
-```
-
-To add an ingredient that feeds directly into `## stir in` *after* a sub-tree of
-deeper actions, use a leaf heading one level below the target action (no children
-means it renders as an ingredient cell spanning the full sub-tree width):
-
-```
-## stir in
-### blend smooth
-#### simmer
-[ingredients under simmer]
-### 100 mL heavy cream    ← leaf ### heading, child of ## stir in ✓
-### salt to taste
-```
-
-The `###` leaf headings here have no children so they render as ingredient cells
-whose colspan covers the full action-column width below `stir in`.
-
-**Inline prep label** — rare, optional prefix `verb: ingredient`:
-```
+melt: 4 oz (115 g) unsalted butter
 lightly beat: 2 large eggs
 ```
 The verb (up to ~20 characters, letters and spaces only) is rendered in italics.
-Use this **only** when the per-ingredient prep is meaningfully different from the
-heading action. Even then, one or two per recipe is already a lot. **Do not add a
-verb prefix to every ingredient** — plain raw-material lines are the norm.
+Omit it for plain ingredients.
+
+Multiple ingredient lines under the same action are siblings — they each occupy
+one row, and the action cell spans all of them.
 
 ---
 
-### `1. 2. 3. …` — Finishing steps
-An ordered list at the top level. Each item becomes a narrow column on the
-**right** edge of the table, spanning all body rows. Use for sequential
-post-mixing steps (bake, cool, etc.).
+### `---` + plain lines — Finishing steps
+A `---` separator marks the start of the finishing steps section.
+Each non-empty line after `---` becomes a narrow column on the **right** edge
+of the table, spanning all body rows. Use for sequential post-mixing steps
+(bake, cool, serve).
 
 ```
-1. bake 350°F (170°C) 55 min.
-2. cool 10 min. in pan
-3. cool on wire rack
+---
+bake 350°F (170°C)\n30 to 40 min
+cool 10 min. in pan
+cool on wire rack
 ```
 
 Use `\n` or `<br/>` to break a long finishing step into multiple lines (produces
-a slightly wider cell rather than a taller table):
-
-```
-1. bake 350°F (170°C)\n30 to 40 min
-```
+a slightly wider cell rather than a taller table).
 
 ---
 
@@ -167,9 +147,9 @@ The app calculates:
 
 - **Rowspan** of an action = number of leaf ingredients in its subtree.
 - **Colspan** of a leaf = how many action columns it must skip to reach its
-  parent (leaves that are direct children of a deep root span multiple columns).
+  parent (leaves that are direct children of a high-N root span multiple columns).
 - **Column order**: ingredients on the left, action columns increasing rightward
-  by depth, finishing steps on the far right.
+  by N value, finishing steps on the far right.
 
 The rendered table therefore reads left → right: ingredients → sub-actions →
 root action → finishing steps.
@@ -179,74 +159,79 @@ root action → finishing steps.
 ## Complete example
 
 ```markdown
-# Brownie (8x8-in pan)
+# Brownie (20×20 cm pan)
 
-> Butter and flour an 8x8-in pan
-> Preheat oven to 350°F (170°C)
+> Butter and flour a 20×20 cm pan
+> Preheat oven to 170°C
 
-## fold in
-### mix
-#### mix
-##### melt
+4. fold in
+3. mix
+2. mix
+1. melt
 115 g unsalted butter
-#### 200 g sugar
-#### 2.5 mL vanilla extract
-#### 60 mL fresh brewed espresso
-### lightly beat: 2 large eggs
-## 80 g all-purpose flour
-## 80 g cocoa powder
-## 1.3 g baking soda
-## 1.5 g table salt
+1. 200 g sugar
+1. 2.5 mL vanilla extract
+1. 60 mL fresh brewed espresso
+2. lightly beat: 2 large eggs
+3. 80 g all-purpose flour
+3. 80 g Hershey's cocoa powder
+3. 1.3 g baking soda
+3. 1.5 g table salt
 
-1. bake 350°F (170°C)\n30 to 40 min
+---
+bake 170°C\n30 to 40 min
 ```
+
+The tree this encodes:
+- `4. fold in` → root action, children: outer-mix + dry ingredients
+- `3. mix` (outer) → child of fold-in, children: inner-mix + eggs
+- `2. mix` (inner) → child of outer-mix, children: melt + sugar + vanilla + espresso
+- `1. melt` → child of inner-mix, children: butter
+- `1. sugar/vanilla/espresso` → siblings of melt, direct children of inner-mix
+- `2. eggs` → sibling of inner-mix, direct child of outer-mix
+- `3. flour/cocoa/…` → siblings of outer-mix, direct children of fold-in
 
 This renders as:
 
 ```
-┌─────────────────────────────────────────────────────┐
-│              Brownie (8x8-in pan)                   │
-├─────────────────────────────────────────────────────┤
-│          Butter and flour an 8x8-in pan             │
-├─────────────────────────────────────────────────────┤
-│         Preheat oven to 350°F (170°C)               │
-├──────────────────────────┬──────┬──────┬──────┬─────┤
-│ 4 oz (115 g) … butter   │ melt │      │      │     │
-├──────────────────────────┤      │ mix  │      │bake │
-│ 1 cup (200 g) sugar      │      │      │      │     │
-├──────────────────────────┤      │      │ mix  │     │
-│ 1/4 tsp. vanilla         │      │      │      │     │
-├──────────────────────────┤      │      │      │fold │
-│ 1 shot espresso          │      │      │      │in   │
-├─────────────────────────────────┤      │      │     │
-│ lightly beat: 2 large eggs      │      │      │     │
-├─────────────────────────────────────────┤      │     │
-│ 1/2 cup flour                           │      │     │
-├─────────────────────────────────────────┤      │     │
-│ 1/3 cup cocoa                           │      │     │
-├─────────────────────────────────────────┤      │     │
-│ 1/4 tsp. baking soda                    │      │     │
-├─────────────────────────────────────────┤      │     │
-│ 1/4 tsp. salt                           │      │     │
-└─────────────────────────────────────────┴──────┴─────┘
+┌──────────────────────────────────────────────────────────┐
+│                  Brownie (20×20 cm pan)                  │
+├──────────────────────────────────────────────────────────┤
+│              Butter and flour a 20×20 cm pan             │
+├──────────────────────────────────────────────────────────┤
+│                  Preheat oven to 170°C                   │
+├──────────────────────┬──────┬─────┬─────┬────────┬──────┤
+│ 115 g butter         │ melt │     │     │        │      │
+├──────────────────────┴──────┤ mix │     │        │ bake │
+│ 200 g sugar                 │     │     │        │ 170° │
+├─────────────────────────────┤     │ mix │ fold   │  30- │
+│ 2.5 mL vanilla extract      │     │     │   in   │  40m │
+├─────────────────────────────┤     │     │        │      │
+│ 60 mL espresso              │     │     │        │      │
+├───────────────────────────────────┤     │        │      │
+│ lightly beat: 2 large eggs        │     │        │      │
+├─────────────────────────────────────────┤        │      │
+│ 80 g all-purpose flour                  │        │      │
+├─────────────────────────────────────────┤        │      │
+│ 80 g Hershey's cocoa powder             │        │      │
+├─────────────────────────────────────────┤        │      │
+│ 1.3 g baking soda                       │        │      │
+├─────────────────────────────────────────┤        │      │
+│ 1.5 g table salt                        │        │      │
+└─────────────────────────────────────────┴────────┴──────┘
 ```
+
+Key rowspans: melt=1, inner-mix=4, outer-mix=5, fold-in=9.
 
 ---
 
 ## Tips for agents
 
-- **Ingredient lines = raw materials + quantity only.** No prep states. `1 onion`
-  not `1 onion, diced`. `2 eggs` not `2 eggs, beaten`. The dicing and beating are
-  expressed as action headings, not appended to the ingredient.
-- **`verb: ingredient` is a last resort**, not a convenience. Ask: can this prep
-  action be its own heading level instead? If yes, use a heading. The inline verb
-  only exists for cases where a single ingredient in a group has a genuinely
-  distinct pre-treatment that can't be its own node (e.g. one egg out of several
-  needs to be beaten while the others don't).
-- Use realistic quantities. Weight (grams/ml) preferred; volume in parentheses
-  is fine too.
-- Nest actions only as deep as the actual cooking process requires.
-- Finishing steps (ordered list) should be sequential and irreversible
+- Use realistic quantities with both volume and weight when known.
+- Choose N values that match cooking order: lowest N = first thing you do,
+  highest N = the final combining step.
+- Numbers don't need to be consecutive; use whatever values feel natural.
+- Finishing steps (after `---`) should be sequential and irreversible
   (bake → cool → serve). Don't put mixing steps there.
 - Keep action node labels short (1–3 words); they are displayed rotated in a
   narrow column.
