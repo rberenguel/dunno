@@ -273,7 +273,7 @@ func injectCSP(html string) string {
 
 	csp := "default-src 'self'; " +
 		"script-src 'self' " + strings.Join(scriptHashes, " ") + "; " +
-		"style-src 'self' " + strings.Join(styleHashes, " ") + "; " +
+		"style-src 'self' 'unsafe-inline'; " +
 		"img-src 'self' data:; font-src 'self' data:; " +
 		"manifest-src 'self' data:; " +
 		"connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
