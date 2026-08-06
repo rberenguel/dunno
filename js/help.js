@@ -456,8 +456,9 @@ Right-click <b>Png</b> in the output pane's tag bar to export a black-on-white P
 <b>Syntax</b>
   <span class="help-cmd"># Title</span>           recipe title (bold, full-width row)
   <span class="help-cmd">&gt; prep step</span>      blockquote = global prep instruction (italic, full-width)
-  <span class="help-cmd">## action</span>         root action column (## depth 1, ### depth 2, …)
-  plain line         ingredient leaf under the current heading
+  <span class="help-cmd">N. action</span>         action column (higher N = rightward, closer to final)
+  <span class="help-cmd">N. ingredient</span>   ingredient attached to step N (pops smaller steps first)
+  plain line         ingredient leaf under the most recent step
   <span class="help-cmd">verb: ingredient</span>  prep-labelled ingredient (verb shown in italic)
   <span class="help-cmd">1. finish step</span>    ordered list = rightmost finishing column(s)
 
@@ -470,40 +471,42 @@ multiple vertical text columns (wider cell, not taller).
 &gt; Butter and flour a 20×20 cm pan
 &gt; Preheat oven to 170°C
 
-## fold in
-### mix
-#### mix
-##### melt
-115 g unsalted butter
-#### 200 g sugar
-#### 2.5 mL vanilla extract
-#### 60 mL fresh brewed espresso or very strong coffee
-### lightly beat: 2 large eggs
-## 80 g all-purpose flour
-## 80 g Hershey's cocoa powder
-## 1.3 g baking soda
-## 1.5 g table salt
+4. fold in
+3. mix
+2. mix
+1. melt
+1. 115 g unsalted butter
+2. 200 g sugar
+2. 2.5 mL vanilla extract
+2. 60 mL fresh brewed espresso or very strong coffee
+3. lightly beat: 2 large eggs
+4. 80 g all-purpose flour
+4. 80 g Hershey's cocoa powder
+4. 1.3 g baking soda
+4. 1.5 g table salt
 
-1. bake 170°C for 30 to 40 min</pre>
+---
+bake 170°C for 30 to 40 min</pre>
 
 <b>Example — Sunflower Seed Crackers</b>
 <pre># Sunflower Seed Crackers
 
-## thorough mix
-### add
-1/2 tbsp honey
-#### add
-75 ml olive oil
-100 ml water
-##### mix dry
-150 g white flour
-2.5 pinches of salt
-sunflower seeds to taste
+4. thorough mix
+3. add honey
+3. 1/2 tbsp honey
+2. add wet
+2. 75 ml olive oil
+2. 100 ml water
+1. mix dry
+1. 150 g white flour
+1. 2.5 pinches of salt
+1. sunflower seeds to taste
 
-1. lay on parchment
-2. press flat 3–3.5 mm
-3. mark thumb-sized cuts
-4. bake 160°C until golden</pre>`,
+---
+lay on parchment
+press flat 3–3.5 mm
+mark thumb-sized cuts
+bake 160°C until golden</pre>`,
   },
 
   sheet: {

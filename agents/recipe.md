@@ -89,26 +89,32 @@ not taller).
 ---
 
 ### Plain paragraph lines — Ingredients (leaf nodes)
-Any plain text line (not a heading, not a blockquote, not a numbered action)
+Any plain text line (not a heading, not a blockquote, not a numbered line)
 is an **ingredient**. It belongs to the most recent `N.` action above it.
 
 ```
 2. mix
 1. melt
 115 g unsalted butter
-1. 200 g sugar
-1. 2.5 mL vanilla extract
 ```
 
 Here `115 g unsalted butter` belongs to `1. melt` (the nearest action above it).
-`200 g sugar` and `vanilla` are written as `1.` nodes — making them siblings of
-`1. melt`, so they attach directly to `2. mix` without their own sub-action.
 
-**An `N.` node with no children is a leaf ingredient**, not an action step. Use
-this pattern whenever an ingredient goes directly into a parent action without
-any named preparation of its own. The rule is: an `N.` node becomes a child of
-the most recent action with a higher number above it, regardless of whether it
-ends up having children or not.
+### `N. ingredient` — Ingredients with explicit parent
+When an ingredient line starts with a number and a dot, the number specifies
+which action it belongs to. The parser pops any open steps with a smaller number,
+then attaches the ingredient to the step that matches.
+
+```
+2. mix
+1. melt
+1. 115 g unsalted butter   ← belongs to 1. melt
+2. 200 g sugar             ← pops 1. melt, belongs to 2. mix
+2. 2.5 mL vanilla extract  ← also belongs to 2. mix
+```
+
+Use this when an ingredient goes directly into an ancestor step without
+passing through the current innermost step.
 
 **Inline prep label** — optional prefix `verb: ingredient`:
 ```
@@ -168,15 +174,15 @@ root action → finishing steps.
 3. mix
 2. mix
 1. melt
-115 g unsalted butter
-1. 200 g sugar
-1. 2.5 mL vanilla extract
-1. 60 mL fresh brewed espresso
-2. lightly beat: 2 large eggs
-3. 80 g all-purpose flour
-3. 80 g Hershey's cocoa powder
-3. 1.3 g baking soda
-3. 1.5 g table salt
+1. 115 g unsalted butter
+2. 200 g sugar
+2. 2.5 mL vanilla extract
+2. 60 mL fresh brewed espresso
+3. lightly beat: 2 large eggs
+4. 80 g all-purpose flour
+4. 80 g Hershey's cocoa powder
+4. 1.3 g baking soda
+4. 1.5 g table salt
 
 ---
 bake 170°C\n30 to 40 min
@@ -187,9 +193,9 @@ The tree this encodes:
 - `3. mix` (outer) → child of fold-in, children: inner-mix + eggs
 - `2. mix` (inner) → child of outer-mix, children: melt + sugar + vanilla + espresso
 - `1. melt` → child of inner-mix, children: butter
-- `1. sugar/vanilla/espresso` → siblings of melt, direct children of inner-mix
-- `2. eggs` → sibling of inner-mix, direct child of outer-mix
-- `3. flour/cocoa/…` → siblings of outer-mix, direct children of fold-in
+- `2. sugar/vanilla/espresso` → siblings of melt, direct children of inner-mix
+- `3. eggs` → sibling of inner-mix, direct child of outer-mix
+- `4. flour/cocoa/…` → siblings of outer-mix, direct children of fold-in
 
 This renders as:
 

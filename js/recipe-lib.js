@@ -62,10 +62,16 @@ export function parseRecipe(md) {
     if (actionM) {
       const n = parseInt(actionM[1], 10);
       const text = normalizeLabel(actionM[2].trim());
-      while (stack.length && stack[stack.length - 1].number <= n) stack.pop();
-      const node = { label: text, prepLabel: null, children: [] };
-      attach(node);
-      stack.push({ number: n, node });
+      while (stack.length && stack[stack.length - 1].number < n) stack.pop();
+      const top = stackTop();
+      if (top && top.number === n) {
+        const { prep, ingredient } = splitPrepLabel(text);
+        top.node.children.push({ label: ingredient, prepLabel: prep, children: [] });
+      } else {
+        const node = { label: text, prepLabel: null, children: [] };
+        attach(node);
+        stack.push({ number: n, node });
+      }
       continue;
     }
 
