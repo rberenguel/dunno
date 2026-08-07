@@ -129,6 +129,42 @@ one row, and the action cell spans all of them.
 
 ---
 
+### `.N` — Close marker (explicit block end)
+
+A line containing only `.N` (a dot followed by a number) closes the currently
+open block at level N and returns context to the nearest ancestor with a higher
+number. This is the close-bracket counterpart to `N. action`.
+
+Use it when you need a **sibling branch of a different depth** — i.e. when one
+sub-tree has fewer action levels than another sub-tree under the same parent.
+
+```
+4. combine
+3. mix_wet
+2. blend
+ingredient_a
+ingredient_b
+.2              ← close blend, back to mix_wet
+3. ingredient_c ← direct child of mix_wet
+.3              ← close mix_wet, back to combine
+1. melt
+ingredient_d
+```
+
+Without `.3`, `1. melt` would attach to `mix_wet` (the nearest open action with
+a higher number). The close marker makes `melt` a sibling of `mix_wet` under
+`combine` instead.
+
+`.N` pops every open block with number ≤ N, so `.3` also closes any open N=2
+block inside it — you don't need to nest close markers unless you want to close
+only an inner level while keeping an outer one open.
+
+For simple linear pipelines (one chain of actions from ingredient to dish) close
+markers are never needed. Use them only when two or more branches under the same
+parent step have genuinely different depths.
+
+---
+
 ### `---` + plain lines — Finishing steps
 A `---` separator marks the start of the finishing steps section.
 Each non-empty line after `---` becomes a narrow column on the **right** edge
@@ -242,5 +278,9 @@ Key rowspans: melt=1, inner-mix=4, outer-mix=5, fold-in=9.
 - Keep action node labels short (1–3 words); they are displayed rotated in a
   narrow column.
 - If a step has only one ingredient, it still works fine as a single-row action.
+- Use `.N` close markers when two sibling branches under the same parent have
+  different depths (e.g. one branch is just `1. melt` while another is
+  `3. mix → 2. blend → 1. whisk`). Without a close marker the shallower branch
+  would incorrectly attach as a child of the deeper one.
 - The `\n` line-break trick is useful for finish steps like temperature + time
   that would otherwise make the table very tall.

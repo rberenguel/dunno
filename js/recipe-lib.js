@@ -58,6 +58,13 @@ export function parseRecipe(md) {
     const prepM = line.match(/^>\s*(.+)/);
     if (prepM) { recipe.prepSteps.push(prepM[1].trim()); continue; }
 
+    const closeM = line.match(/^\.(\d+)\s*$/);
+    if (closeM) {
+      const n = parseInt(closeM[1], 10);
+      while (stack.length && stack[stack.length - 1].number <= n) stack.pop();
+      continue;
+    }
+
     const actionM = line.match(/^(\d+)\.\s+(.+)/);
     if (actionM) {
       const n = parseInt(actionM[1], 10);
@@ -108,11 +115,11 @@ export function buildLayoutCells(recipe) {
     } else {
       slots[startRow].push({
         row: startRow, col: h,
-        rowspan: rs, colspan: 1,
+        rowspan: rs, colspan: Math.max(1, parentHeight - h),
         text: node.label, prepLabel: null,
         type: 'action',
       });
-      const sortedChildren = node.children.slice().sort((a, b) => calcHeight(b) - calcHeight(a));
+      const sortedChildren = node.children.slice();
       let childRow = startRow;
       for (const child of sortedChildren) {
         place(child, childRow, h);
