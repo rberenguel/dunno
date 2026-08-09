@@ -1,5 +1,5 @@
 import {
-  createColumn, createPane,
+  createColumn, createPane, rebuildColHandles,
   deletePane, splitPane, addColumn, swapPane, diffPane,
   getPrev, getPane, setPaneDisplay,
   getState, restoreState, resetLayout,
@@ -7,6 +7,7 @@ import {
   setFileDropHandler,
   toggleLineNumbers, toggleRuler, toggleLock, setHighlightLang,
   getAllPanes, isAnyPaneDirty, setDirtyCallback,
+  getActive,
 } from './tiling.js';
 import {
   init,
@@ -230,7 +231,7 @@ register('Grep',   ctx => {
     outId = splitPane(ctx.paneId);
     ctx.pane.grepOutputId = outId;
     const out = getPane(outId);
-    if (out) out.tagEl.textContent = 'grep Del';
+    if (out) { out.tagEl.textContent = 'grep Del'; out.transient = true; }
   }
   getPane(outId)?.jar.updateCode(output);
 });
@@ -392,8 +393,14 @@ register('Import', ctx => {
   }
 });
 
-register('dark',   () => document.body.classList.add('dark'));
-register('light',  () => document.body.classList.remove('dark'));
+function _syncThemeColor() {
+  const dark = document.body.classList.contains('dark');
+  document.querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', dark ? '#0f1020' : '#dde3ff');
+}
+
+register('dark',  () => { document.body.classList.add('dark');    _syncThemeColor(); });
+register('light', () => { document.body.classList.remove('dark'); _syncThemeColor(); });
 
 // ── File I/O ───────────────────────────────────────────────────────────────────
 
@@ -496,6 +503,116 @@ register('Preview', ctx => {
   setPaneDisplay(outId, html);
 });
 
+// ── TOC ────────────────────────────────────────────────────────────────────────
+
+register('Toc', ctx => {
+  const srcText   = ctx.pane.jar.toString();
+  const srcPaneId = ctx.paneId;
+
+  const headings = [];
+  const re = /^(#{1,6})\s+(.+)$/gm;
+  let m;
+  while ((m = re.exec(srcText)) !== null) {
+    headings.push({ level: m[1].length, text: m[2].trim(), offset: m.index });
+  }
+  if (!headings.length) { _toast('No headings found'); return; }
+
+  // Create or reuse TOC pane in its own column.
+  let tocPaneId = ctx.pane.tocOutputId;
+  if (!tocPaneId || !getPane(tocPaneId)) {
+    const newColId = createColumn(ctx.pane.colId);
+    tocPaneId = createPane(newColId, '', 'toc Del');
+    ctx.pane.tocOutputId = tocPaneId;
+    rebuildColHandles();
+    // Narrow column for TOC.
+    const tocPane = getPane(tocPaneId);
+    if (tocPane) tocPane.el.parentElement.style.flex = '0 0 220px';
+  }
+
+  const tocPane = getPane(tocPaneId);
+  if (!tocPane) return;
+
+  // Mark as transient so state serialisation skips it.
+  tocPane.transient = true;
+  tocPane.editorEl.style.display = 'none';
+
+  let displayEl = tocPane.bodyEl.querySelector('.pane-display');
+  if (!displayEl) {
+    displayEl = document.createElement('div');
+    displayEl.className = 'pane-display';
+    tocPane.bodyEl.appendChild(displayEl);
+  }
+
+  // Collapsed state: Set of heading indices whose children are hidden.
+  const collapsed = new Set();
+
+  function hasChildren(idx) {
+    const lvl = headings[idx].level;
+    return idx + 1 < headings.length && headings[idx + 1].level > lvl;
+  }
+
+  function isHidden(idx) {
+    for (let p = idx - 1; p >= 0; p--) {
+      if (headings[p].level < headings[idx].level && collapsed.has(p)) return true;
+    }
+    return false;
+  }
+
+  function render() {
+    const ul = document.createElement('ul');
+    ul.className = 'toc-list';
+    headings.forEach((h, i) => {
+      const li = document.createElement('li');
+      li.className = `toc-item toc-h${h.level}${isHidden(i) ? ' toc-hidden' : ''}`;
+
+      const toggle = document.createElement('span');
+      toggle.className = 'toc-toggle';
+      if (hasChildren(i)) {
+        toggle.textContent = collapsed.has(i) ? '▶' : '▼';
+        toggle.addEventListener('click', e => {
+          e.stopPropagation();
+          if (collapsed.has(i)) collapsed.delete(i); else collapsed.add(i);
+          render();
+        });
+      }
+
+      const label = document.createElement('span');
+      label.className = 'toc-label';
+      label.textContent = h.text;
+      label.title = h.text;
+      label.addEventListener('click', () => _scrollToHeading(srcPaneId, h.offset));
+
+      li.appendChild(toggle);
+      li.appendChild(label);
+      ul.appendChild(li);
+    });
+    displayEl.innerHTML = '';
+    displayEl.appendChild(ul);
+  }
+
+  render();
+});
+
+function _scrollToHeading(paneId, charOffset) {
+  const pane = getPane(paneId);
+  if (!pane) return;
+  const walker = document.createTreeWalker(pane.editorEl, NodeFilter.SHOW_TEXT);
+  let cur = 0;
+  let node;
+  while ((node = walker.nextNode())) {
+    if (cur + node.length >= charOffset) {
+      const range = document.createRange();
+      range.setStart(node, charOffset - cur);
+      range.collapse(true);
+      const rect    = range.getBoundingClientRect();
+      const bodyRect = pane.bodyEl.getBoundingClientRect();
+      pane.bodyEl.scrollTop += rect.top - bodyRect.top - 40;
+      return;
+    }
+    cur += node.length;
+  }
+}
+
 // ── Format (Prettier) ────────────────────────────────────────────────────────
 
 register('Format', async ctx => {
@@ -572,7 +689,7 @@ register('Eval', ctx => {
     outId = splitPane(ctx.paneId);
     ctx.pane.evalOutputId = outId;
     const out = getPane(outId);
-    if (out) out.tagEl.textContent = 'eval-out Del';
+    if (out) { out.tagEl.textContent = 'eval-out Del'; out.transient = true; }
   }
   getPane(outId)?.jar.updateCode(output);
 });
@@ -916,3 +1033,44 @@ window.addEventListener('beforeunload', _sessionSave);
 setInterval(_sessionSave, 30_000);
 
 _init();
+
+// ── Public extension API ───────────────────────────────────────────────────────
+
+function _editorHandle(pane, selection = null) {
+  return {
+    getText: () => pane.jar.toString(),
+    setText: text => pane.jar.updateCode(text),
+    getSelection: () => selection ?? window.getSelection?.()?.toString().trim() ?? '',
+    setTag: label => { pane.tagEl.textContent = label; },
+    setDisplay: html => setPaneDisplay(pane.id, html),
+    getFilename: () => getPaneFile(pane.id)?.name ?? null,
+    focus: () => pane.editorEl.focus(),
+    split(key, tag = '') {
+      const storeKey = '__ext_' + key;
+      let outId = pane[storeKey];
+      if (!outId || !getPane(outId)) {
+        outId = splitPane(pane.id);
+        pane[storeKey] = outId;
+      }
+      const out = getPane(outId);
+      if (out && tag) out.tagEl.textContent = tag;
+      return out ? _editorHandle(out) : null;
+    },
+  };
+}
+
+window.dunno = {
+  register(cmd, fn) {
+    register(cmd, ctx => fn(_editorHandle(ctx.pane, ctx.selection)));
+  },
+  getActiveEditor() {
+    const pane = getActive();
+    return pane ? _editorHandle(pane) : null;
+  },
+  getPreviousEditor() {
+    const pane = getPrev();
+    return pane ? _editorHandle(pane) : null;
+  },
+  toast: msg => _toast(msg),
+  isDark: () => document.body.classList.contains('dark'),
+};

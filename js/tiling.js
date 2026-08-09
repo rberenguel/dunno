@@ -346,6 +346,8 @@ function _initHResize(handle) {
   });
 }
 
+export function rebuildColHandles() { _rebuildColHandles(); }
+
 function _rebuildColHandles() {
   _layout().querySelectorAll('.resize-h').forEach(h => h.remove());
   const colEls = _colOrder.map(id => _cols.get(id)?.el).filter(Boolean);
@@ -432,6 +434,14 @@ export function createPane(colId, content = '', tagText = null) {
         const text = editor.textContent;
         const html = window.Prism.highlight(text, grammar, pane.highlightLang);
         editor.innerHTML = html;
+        if (pane.highlightLang === 'markdown') {
+          editor.querySelectorAll('.token.title.important').forEach(el => {
+            const punc = el.querySelector('.token.punctuation');
+            if (!punc) return;
+            const m = punc.textContent.match(/^(#+)/);
+            if (m) el.dataset.mdLevel = Math.min(m[1].length, 6);
+          });
+        }
       }
     }
     if (_extraHighlight) _extraHighlight(editor);

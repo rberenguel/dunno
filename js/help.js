@@ -36,6 +36,7 @@ const SECTIONS = [
     { cmd: 'Plot',    desc: 'Render gnuplot spec (prev pane as data)' },
     { cmd: 'Eval',    desc: 'Run pane as JS; stdout → split pane' },
     { cmd: 'Preview', desc: 'Render pane as Markdown → HTML' },
+    { cmd: 'Toc',     desc: 'Table of contents for Markdown headings' },
     { cmd: 'Recipe',  desc: 'Render recipe Markdown as flowchart table' },
     { cmd: 'Sheet',   desc: 'Open up to 4 recipes as a printable A4 HTML sheet' },
     { cmd: 'Format',  desc: 'Reformat pane (select a language, or infer from filename)' },
@@ -361,6 +362,22 @@ Supported: headings, bold/italic, code blocks, blockquotes,
            links, images, tables, horizontal rules.
 
 <b>Tip</b>: combine with Load to preview a .md file from disk.`,
+  },
+
+  toc: {
+    title: 'Toc',
+    body: `Toc builds a Table of Contents for the current pane's Markdown headings.
+
+The output appears in a new column to the right (tag: toc Del), narrow by
+default so it doesn't crowd the document.
+
+<b>Interaction</b>
+  • Click a heading label   → scrolls the source pane to that heading
+  • Click the ▼/▶ toggle   → fold/unfold that heading's children
+
+Re-running Toc on the same pane refreshes the TOC in place.
+
+<b>Tip</b>: works on any text with # headings, not just files named .md.`,
   },
 
   calc: {

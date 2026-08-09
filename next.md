@@ -1,54 +1,16 @@
 # Next steps
 
-## 1. Bundler (`bundle.go`) — priority
-
-Produce a single self-contained `dunno.html` with no external dependencies, same approach as `../scream/weave.go`:
-
-- Inline `css/app.css`
-- Bundle the ES module graph (`js/main.js` + transitive imports) into an IIFE — strip `import`/`export` keywords, concatenate in dependency order
-- Inline `libs/codejar.js` as part of the IIFE
-- Strip the service-worker registration block
-- Remove the manifest link
-
-The result should open directly from the filesystem or be shared as a single file.
-
-## 2. Plot improvements
+## 1. Plot improvements
 
 - `set logscale x` / `set logscale y` / `set logscale xy`
 - `set xtics` / `set ytics` for manual tick control
-- `smooth csplines` / `smooth bezier` on `plot` — interpolate sparse data
+- `smooth csplines` / `smooth bezier` — interpolate sparse data
 - Error bars: `with errorbars using 1:2:3` (col 3 = ±error)
 - Multiple y-axes (`axes x1y2`)
 - Light-mode SVG colours (currently hardcoded dark)
 - Clamp lines at clip boundary rather than dropping whole segment
 
-## 3. Pane resize
-
-Drag the tag bar vertically to resize panes within a column. Drag a column border horizontally to resize columns. Store sizes in saved state.
-
-## 4. Markdown preview
-
-A `Preview` command that renders the current pane's markdown as HTML in a display pane below (using `marked.min.js`, already in scream). Toggle back with `Preview` again.
-
-## 5. File I/O
-
-- `Open` — File System Access API (`showOpenFilePicker`) to load a file into the current pane
-- `Write` — save current pane content back to the file it was opened from
-- Fallback: download as `.md` / `.txt` when File System Access is unavailable
-
-## 6. Text manipulation commands
-
-Short, composable commands that operate on the pane content (or selection if one is active):
-
-- `Sort` — sort lines alphabetically
-- `Uniq` — deduplicate adjacent lines
-- `Upper` / `Lower` — case conversion
-- `Wrap N` — hard-wrap at N columns (default 80)
-- `Json` — pretty-print JSON
-
-These would make dunno useful as a lightweight scratchpad for data wrangling.
-
-## 7. Pane identity
+## 2. Pane identity
 
 Allow the first word of the tag bar (before the command words) to serve as a pane name, so commands like `Diff` and `Plot` can reference panes by name rather than relying solely on "previously active":
 
@@ -58,3 +20,55 @@ spec      Del New Plot
 ```
 
 `plot "-" using 1:2` would still use the previously active pane for compatibility, but an explicit `plot "data.csv"` could look up the pane named `data.csv`.
+
+## 3. Autoload JS panes
+
+A pane flagged as autoload would have its content eval'd on session restore, making plugins available immediately without manual right-click Eval.
+
+The flag could live in the saved pane state (a boolean `autoload` property) or be detected from a magic first line (`// @autoload`) to keep it visible and editable in the pane itself. The latter is more transparent — the user can see and toggle it without a separate UI.
+
+Hook point is `_onPaneRestored` in `main.js`, which already handles per-pane state like `isCalc` and `highlightLang`.
+
+### Open questions
+
+- Should autoload panes run in a restricted scope or full `window` access? (Full access is needed for `dunno.register` to work.)
+- Should errors in autoload panes surface as toasts, or silently log to console?
+
+## 4. Bulk file loading / folder loading
+
+`showOpenFilePicker` already accepts `multiple: true` — a `LoadAll` command could open several files at once, each into its own pane. `showDirectoryPicker` (Chrome/Edge) could load an entire folder, filtering by extension (e.g. `.js` for plugin directories).
+
+Combined with autoload, a workflow emerges: pick a plugins folder, load all `.js` files as autoload panes, and they're available on every subsequent session start without re-loading.
+
+### Open questions
+
+- Should `LoadAll` create panes in the current column or spread across new columns?
+- Folder loading should probably filter by extension — configurable via selection (e.g. select `js` then right-click `LoadDir`)?
+
+## 5. Extension event system
+
+Plugins registered via `dunno.register` only run on demand (right-click). A live plugin — one that updates its output as the user moves around — needs to subscribe to pane lifecycle events.
+
+### Proposed API
+
+```js
+dunno.on('activate', editor => { /* pane gained focus */ })
+dunno.on('change',   editor => { /* pane content changed */ })
+dunno.on('theme',    isDark  => { /* dark/light toggled */ })
+dunno.off('activate', fn)
+```
+
+### Implementation sketch
+
+A small internal emitter (new `js/events.js` or inline in `tiling.js`) fires at existing hook points:
+
+- `activate` — end of `_setActive` in `tiling.js`
+- `change` — the `input` listener already on `editorEl`
+- `theme` — wherever `dark`/`light` commands toggle `body.classList`
+
+`main.js` wraps the emitter behind `dunno.on` / `dunno.off`; listeners receive an editor handle via `_editorHandle`, never the raw pane.
+
+### Open questions
+
+- `change` fires on every keystroke — should dunno debounce internally (e.g. 300 ms) or leave it to the plugin?
+- Should `on` return an unsubscribe function in addition to `off`?
