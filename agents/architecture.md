@@ -19,7 +19,9 @@ dunno is a tiled text editor. Right-clicking any word in a pane fires it as a co
 | `editor.setDisplay(html)` | Renders HTML into this pane, replacing the editable content (same as Preview/Plot). |
 | `editor.getFilename()` | Returns the filename associated with this pane, or `null`. |
 | `editor.focus()` | Moves keyboard focus to this pane. |
-| `editor.split(key, tag?)` | Returns an editor handle for a persistent output pane. Creates one on first call; reuses it on subsequent calls. `key` is a string scoped to the source pane. `tag` sets the tag bar label. |
+| `editor.split(key, tag?)` | Returns an editor handle for a persistent output pane in the same column (horizontal split). Creates on first call; reuses on subsequent calls. `key` is a string scoped to the source pane. `tag` sets the tag bar label. |
+| `editor.splitLeft(key, tag?)` | Like `split`, but creates a new column to the left of the source pane's column. |
+| `editor.splitRight(key, tag?)` | Like `split`, but creates a new column to the right of the source pane's column. |
 | `dunno.isDark()` | Returns `true` if the dark theme is active. |
 
 Command names are case-insensitive. A registered name that matches a built-in overwrites it.

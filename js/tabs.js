@@ -21,6 +21,7 @@ let _active = 0;
 let _tabBarEl = null;
 let _onSwitch = null;
 let _onClose = null;
+let _dragSrc = -1;
 
 export function init({ onSwitch, onClose }) {
   _onSwitch = onSwitch;
@@ -146,6 +147,45 @@ function _render() {
         if (_onSwitch) _onSwitch(idx);
       }
     });
+
+    tab.draggable = true;
+    tab.addEventListener('dragstart', e => {
+      _dragSrc = idx;
+      e.dataTransfer.effectAllowed = 'move';
+      tab.classList.add('drag-dragging');
+    });
+    tab.addEventListener('dragend', () => {
+      _dragSrc = -1;
+      _tabBarEl.querySelectorAll('.drag-dragging, .drag-over').forEach(el => {
+        el.classList.remove('drag-dragging', 'drag-over');
+      });
+    });
+    tab.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (idx !== _dragSrc) {
+        _tabBarEl.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        tab.classList.add('drag-over');
+      }
+    });
+    tab.addEventListener('drop', e => {
+      e.preventDefault();
+      if (_dragSrc < 0 || _dragSrc === idx) return;
+      const [m] = _meta.splice(_dragSrc, 1);
+      const [s] = _states.splice(_dragSrc, 1);
+      _meta.splice(idx, 0, m);
+      _states.splice(idx, 0, s);
+      if (_active === _dragSrc) {
+        _active = idx;
+      } else if (_dragSrc < _active && idx >= _active) {
+        _active--;
+      } else if (_dragSrc > _active && idx <= _active) {
+        _active++;
+      }
+      _dragSrc = -1;
+      _render();
+    });
+
     _tabBarEl.appendChild(tab);
   });
 }

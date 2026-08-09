@@ -1,5 +1,5 @@
 import {
-  createColumn, createPane, rebuildColHandles,
+  createColumn, createColumnBefore, createPane, rebuildColHandles,
   deletePane, splitPane, addColumn, swapPane, diffPane,
   getPrev, getPane, setPaneDisplay,
   getState, restoreState, resetLayout,
@@ -520,7 +520,7 @@ register('Toc', ctx => {
   // Create or reuse TOC pane in its own column.
   let tocPaneId = ctx.pane.tocOutputId;
   if (!tocPaneId || !getPane(tocPaneId)) {
-    const newColId = createColumn(ctx.pane.colId);
+    const newColId = createColumnBefore(ctx.pane.colId);
     tocPaneId = createPane(newColId, '', 'toc Del');
     ctx.pane.tocOutputId = tocPaneId;
     rebuildColHandles();
@@ -600,11 +600,12 @@ function _scrollToHeading(paneId, charOffset) {
   let cur = 0;
   let node;
   while ((node = walker.nextNode())) {
-    if (cur + node.length >= charOffset) {
+    if (node.length === 0) continue;
+    if (cur + node.length > charOffset) {
       const range = document.createRange();
       range.setStart(node, charOffset - cur);
       range.collapse(true);
-      const rect    = range.getBoundingClientRect();
+      const rect     = range.getBoundingClientRect();
       const bodyRect = pane.bodyEl.getBoundingClientRect();
       pane.bodyEl.scrollTop += rect.top - bodyRect.top - 40;
       return;
@@ -1051,6 +1052,32 @@ function _editorHandle(pane, selection = null) {
       if (!outId || !getPane(outId)) {
         outId = splitPane(pane.id);
         pane[storeKey] = outId;
+      }
+      const out = getPane(outId);
+      if (out && tag) out.tagEl.textContent = tag;
+      return out ? _editorHandle(out) : null;
+    },
+    splitLeft(key, tag = '') {
+      const storeKey = '__ext_col_l_' + key;
+      let outId = pane[storeKey];
+      if (!outId || !getPane(outId)) {
+        const colId = createColumnBefore(pane.colId);
+        outId = createPane(colId, '', tag);
+        pane[storeKey] = outId;
+        rebuildColHandles();
+      }
+      const out = getPane(outId);
+      if (out && tag) out.tagEl.textContent = tag;
+      return out ? _editorHandle(out) : null;
+    },
+    splitRight(key, tag = '') {
+      const storeKey = '__ext_col_r_' + key;
+      let outId = pane[storeKey];
+      if (!outId || !getPane(outId)) {
+        const colId = createColumn(pane.colId);
+        outId = createPane(colId, '', tag);
+        pane[storeKey] = outId;
+        rebuildColHandles();
       }
       const out = getPane(outId);
       if (out && tag) out.tagEl.textContent = tag;

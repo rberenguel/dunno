@@ -6,6 +6,8 @@ import { makeHighlighter }    from './highlight.js';
 let _id = 0;
 const uid = () => String(++_id);
 
+const _hesc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 const _cols  = new Map(); // id -> { id, el, paneIds }
 const _panes = new Map(); // id -> pane object
 let _colOrder     = [];
@@ -257,6 +259,24 @@ export function createColumn(afterColId = null) {
   return id;
 }
 
+export function createColumnBefore(colId) {
+  const id = uid();
+  const el = document.createElement('div');
+  el.className = 'column';
+  el.dataset.colId = id;
+  const ref = _cols.get(colId);
+  if (ref) {
+    ref.el.before(el);
+    const idx = _colOrder.indexOf(colId);
+    _colOrder.splice(idx, 0, id);
+  } else {
+    _layout().prepend(el);
+    _colOrder.unshift(id);
+  }
+  _cols.set(id, { id, el, paneIds: [] });
+  return id;
+}
+
 function _deleteColumn(colId) {
   _cols.get(colId)?.el.remove();
   _cols.delete(colId);
@@ -440,6 +460,14 @@ export function createPane(colId, content = '', tagText = null) {
             if (!punc) return;
             const m = punc.textContent.match(/^(#+)/);
             if (m) el.dataset.mdLevel = Math.min(m[1].length, 6);
+          });
+          editor.querySelectorAll('.token.code-snippet').forEach(el => {
+            const raw = el.textContent;
+            const m = raw.match(/^(`+)([\s\S]*?)\1$/);
+            if (!m) return;
+            const bt = _hesc(m[1]);
+            const inner = _hesc(m[2]);
+            el.innerHTML = `<span class="md-bt">${bt}</span><span class="md-code-inner">${inner}</span><span class="md-bt">${bt}</span>`;
           });
         }
       }
