@@ -181,6 +181,16 @@ func embedManifest(html, rootDir string) string {
 	return reManifest.ReplaceAllLiteralString(html, `<link rel="manifest" href="`+dataURI+`" />`)
 }
 
+func injectArchitecture(html, rootDir string) string {
+	mdPath := filepath.Join(rootDir, "agents/architecture.md")
+	md, err := os.ReadFile(mdPath)
+	if err != nil {
+		return html // no architecture.md — skip silently
+	}
+	block := "<!--\n" + string(md) + "\n-->\n"
+	return strings.Replace(html, "<!doctype html>", "<!doctype html>\n"+block, 1)
+}
+
 func processHtml(src, rootDir string) string {
 	// Embed manifest.json as a data: URI on the <link rel="manifest"> tag
 	// (icon inlined too) instead of stripping it — see embedManifest below.
@@ -233,6 +243,9 @@ func processHtml(src, rootDir string) string {
 	reModule := regexp.MustCompile(`<script type="module" src="js/main\.js"></script>`)
 	src = reModule.ReplaceAllLiteralString(src, buildIifeBundle(rootDir))
 
+	// Embed architecture reference for agents/extensions.
+	src = injectArchitecture(src, rootDir)
+
 	return src
 }
 
@@ -272,7 +285,7 @@ func injectCSP(html string) string {
 	}
 
 	csp := "default-src 'self'; " +
-		"script-src 'self' " + strings.Join(scriptHashes, " ") + "; " +
+		"script-src 'self' 'unsafe-eval' " + strings.Join(scriptHashes, " ") + "; " +
 		"style-src 'self' 'unsafe-inline'; " +
 		"img-src 'self' data:; font-src 'self' data:; " +
 		"manifest-src 'self' data:; " +

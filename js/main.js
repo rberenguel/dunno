@@ -7,6 +7,7 @@ import {
   setFileDropHandler,
   toggleLineNumbers, toggleRuler, toggleLock, setHighlightLang,
   getAllPanes, isAnyPaneDirty, setDirtyCallback,
+  getActive,
 } from './tiling.js';
 import {
   init,
@@ -230,7 +231,7 @@ register('Grep',   ctx => {
     outId = splitPane(ctx.paneId);
     ctx.pane.grepOutputId = outId;
     const out = getPane(outId);
-    if (out) out.tagEl.textContent = 'grep Del';
+    if (out) { out.tagEl.textContent = 'grep Del'; out.transient = true; }
   }
   getPane(outId)?.jar.updateCode(output);
 });
@@ -572,7 +573,7 @@ register('Eval', ctx => {
     outId = splitPane(ctx.paneId);
     ctx.pane.evalOutputId = outId;
     const out = getPane(outId);
-    if (out) out.tagEl.textContent = 'eval-out Del';
+    if (out) { out.tagEl.textContent = 'eval-out Del'; out.transient = true; }
   }
   getPane(outId)?.jar.updateCode(output);
 });
@@ -916,3 +917,44 @@ window.addEventListener('beforeunload', _sessionSave);
 setInterval(_sessionSave, 30_000);
 
 _init();
+
+// ── Public extension API ───────────────────────────────────────────────────────
+
+function _editorHandle(pane, selection = null) {
+  return {
+    getText: () => pane.jar.toString(),
+    setText: text => pane.jar.updateCode(text),
+    getSelection: () => selection ?? window.getSelection?.()?.toString().trim() ?? '',
+    setTag: label => { pane.tagEl.textContent = label; },
+    setDisplay: html => setPaneDisplay(pane.id, html),
+    getFilename: () => getPaneFile(pane.id)?.name ?? null,
+    focus: () => pane.editorEl.focus(),
+    split(key, tag = '') {
+      const storeKey = '__ext_' + key;
+      let outId = pane[storeKey];
+      if (!outId || !getPane(outId)) {
+        outId = splitPane(pane.id);
+        pane[storeKey] = outId;
+      }
+      const out = getPane(outId);
+      if (out && tag) out.tagEl.textContent = tag;
+      return out ? _editorHandle(out) : null;
+    },
+  };
+}
+
+window.dunno = {
+  register(cmd, fn) {
+    register(cmd, ctx => fn(_editorHandle(ctx.pane, ctx.selection)));
+  },
+  getActiveEditor() {
+    const pane = getActive();
+    return pane ? _editorHandle(pane) : null;
+  },
+  getPreviousEditor() {
+    const pane = getPrev();
+    return pane ? _editorHandle(pane) : null;
+  },
+  toast: msg => _toast(msg),
+  isDark: () => document.body.classList.contains('dark'),
+};
