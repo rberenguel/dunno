@@ -1,5 +1,5 @@
 import {
-  createColumn, createColumnBefore, createPane, rebuildColHandles,
+  createColumn, createColumnBefore, createPane, rebuildColHandles, normalizeColWidths,
   deletePane, splitPane, addColumn, swapPane, diffPane,
   getPrev, getPane, setPaneDisplay,
   getState, restoreState, resetLayout,
@@ -59,6 +59,9 @@ function _onPaneRestored(pane, saved) {
   if (saved.isCalc) attachCalc(pane);
   if (saved.showLineNums) toggleLineNumbers(pane.id);
   if (saved.highlightLang) setHighlightLang(pane.id, saved.highlightLang);
+  // Rebuild TOC after the full layout is restored so all columns exist and
+  // getBoundingClientRect() returns accurate widths for normalisation.
+  if (saved.tocActive) requestAnimationFrame(() => _buildToc(pane, true));
 }
 
 // ── Modal ───────────────────────────────────────────────────────────────────────
@@ -90,7 +93,13 @@ function _setupModal() {
 
 // ── Layout commands ────────────────────────────────────────────────────────────
 
-register('Del',    ctx => deletePane(ctx.paneId));
+register('Del',    ctx => {
+  if (ctx.pane.tocSourcePaneId) {
+    const src = getPane(ctx.pane.tocSourcePaneId);
+    if (src) src.tocActive = false;
+  }
+  deletePane(ctx.paneId);
+});
 register('New',    ctx => splitPane(ctx.paneId));
 register('Newcol', ctx => addColumn(ctx.paneId));
 register('Swap',   ctx => swapPane(ctx.paneId));
@@ -505,29 +514,35 @@ register('Preview', ctx => {
 
 // ── TOC ────────────────────────────────────────────────────────────────────────
 
-register('Toc', ctx => {
-  const srcText   = ctx.pane.jar.toString();
-  const srcPaneId = ctx.paneId;
-
+// Shared TOC build logic used both by the Toc command and auto-restore.
+// silent=true suppresses the "no headings" toast (used during restore).
+function _buildToc(srcPane, silent = false) {
+  const srcText = srcPane.jar.toString();
   const headings = [];
   const re = /^(#{1,6})\s+(.+)$/gm;
   let m;
   while ((m = re.exec(srcText)) !== null) {
     headings.push({ level: m[1].length, text: m[2].trim(), offset: m.index });
   }
-  if (!headings.length) { _toast('No headings found'); return; }
+  if (!headings.length) { if (!silent) _toast('No headings found'); return; }
 
-  // Create or reuse TOC pane in its own column.
-  let tocPaneId = ctx.pane.tocOutputId;
+  // Create or reuse the TOC pane in its own column.
+  let tocPaneId = srcPane.tocOutputId;
   if (!tocPaneId || !getPane(tocPaneId)) {
-    const newColId = createColumnBefore(ctx.pane.colId);
+    const newColId = createColumnBefore(srcPane.colId);
     tocPaneId = createPane(newColId, '', 'toc Del');
-    ctx.pane.tocOutputId = tocPaneId;
+    srcPane.tocOutputId = tocPaneId;
+    const tocColEl = getPane(tocPaneId)?.el.parentElement;
+    if (tocColEl) tocColEl.style.flex = '0 0 220px';
+    // Proportionally shrink/grow the other columns so they fill the remaining
+    // space and the layout never overflows or leaves a gap on the right.
+    normalizeColWidths(newColId);
     rebuildColHandles();
-    // Narrow column for TOC.
     const tocPane = getPane(tocPaneId);
-    if (tocPane) tocPane.el.parentElement.style.flex = '0 0 220px';
+    if (tocPane) tocPane.tocSourcePaneId = srcPane.id;
   }
+
+  srcPane.tocActive = true;
 
   const tocPane = getPane(tocPaneId);
   if (!tocPane) return;
@@ -580,7 +595,7 @@ register('Toc', ctx => {
       label.className = 'toc-label';
       label.textContent = h.text;
       label.title = h.text;
-      label.addEventListener('click', () => _scrollToHeading(srcPaneId, h.offset));
+      label.addEventListener('click', () => _scrollToHeading(srcPane.id, h.offset));
 
       li.appendChild(toggle);
       li.appendChild(label);
@@ -591,7 +606,9 @@ register('Toc', ctx => {
   }
 
   render();
-});
+}
+
+register('Toc', ctx => _buildToc(ctx.pane));
 
 function _scrollToHeading(paneId, charOffset) {
   const pane = getPane(paneId);

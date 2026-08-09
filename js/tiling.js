@@ -368,6 +368,34 @@ function _initHResize(handle) {
 
 export function rebuildColHandles() { _rebuildColHandles(); }
 
+// Proportionally scale every column except exceptColId to fill the remaining
+// space after exceptColId's width is reserved. Needed when inserting a fixed-
+// width column (e.g. TOC) so existing columns don't overflow or leave a gap.
+export function normalizeColWidths(exceptColId) {
+  const otherEls = _colOrder
+    .filter(id => id !== exceptColId)
+    .map(id => _cols.get(id)?.el)
+    .filter(Boolean);
+  if (!otherEls.length) return;
+  // Only redistribute if every other column already has an explicit flex-basis
+  // (i.e. the user has dragged a resize handle). Auto-sized columns don't need
+  // adjustment — the browser's flex algorithm already fills the available space.
+  if (!otherEls.every(el => el.style.flexBasis !== '')) return;
+  const layout = _layout();
+  if (!layout) return;
+  const totalW   = layout.getBoundingClientRect().width;
+  const exceptEl = _cols.get(exceptColId)?.el;
+  const exceptW  = exceptEl ? exceptEl.getBoundingClientRect().width : 0;
+  const available = totalW - exceptW;
+  if (available <= 0) return;
+  const currentTotal = otherEls.reduce((s, el) => s + el.getBoundingClientRect().width, 0);
+  if (currentTotal <= 0) return;
+  const scale = available / currentTotal;
+  otherEls.forEach(el => {
+    el.style.flex = `0 0 ${Math.round(el.getBoundingClientRect().width * scale)}px`;
+  });
+}
+
 function _rebuildColHandles() {
   _layout().querySelectorAll('.resize-h').forEach(h => h.remove());
   const colEls = _colOrder.map(id => _cols.get(id)?.el).filter(Boolean);
@@ -707,6 +735,7 @@ export function getState() {
       fontSize:  pane.fontSize || null,
       locked:    pane.locked || false,
       highlightLang: pane.highlightLang || null,
+      tocActive: pane.tocActive || false,
     };
   }
   return state;
