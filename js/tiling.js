@@ -3,6 +3,7 @@ import { isCommand, execute } from './commands.js';
 import { diffLines }          from './diff.js';
 import { makeHighlighter }    from './highlight.js';
 import { emit }               from './events.js';
+import { addOverlay, clearOverlays, removeOverlay, refreshOverlays } from './overlay.js';
 
 let _id = 0;
 const uid = () => String(++_id);
@@ -195,7 +196,15 @@ function _onContextMenu(e, paneId) {
   const word = _wordAtPoint(e.clientX, e.clientY);
   if (word && isCommand(word)) {
     e.preventDefault();
-    execute(word, { paneId, pane: _panes.get(paneId), selection: sel });
+    const pane = _panes.get(paneId);
+    let overlay = null;
+    const markEl = e.target.closest('.overlay-mark');
+    if (markEl && pane) {
+      const ovId = Number(markEl.dataset.ovId);
+      const ov = pane.overlays.get(ovId);
+      if (ov) overlay = { id: ov.id, start: ov.start, end: ov.end, className: ov.className, tooltip: ov.tooltip };
+    }
+    execute(word, { paneId, pane, selection: sel, overlay });
   }
 }
 
@@ -459,7 +468,13 @@ export function createPane(colId, content = '', tagText = null) {
   lineNumEl.className = 'line-gutter';
   lineNumEl.hidden = true;
 
-  bodyEl.appendChild(editorEl);
+  const editorWrap = document.createElement('div');
+  editorWrap.className = 'editor-wrap';
+  const overlayEl = document.createElement('div');
+  overlayEl.className = 'pane-overlay';
+  editorWrap.appendChild(editorEl);
+  editorWrap.appendChild(overlayEl);
+  bodyEl.appendChild(editorWrap);
   bodyEl.appendChild(lineNumEl);
   tagBarEl.appendChild(filenameEl);
   tagBarEl.appendChild(dirtyEl);
@@ -521,10 +536,12 @@ export function createPane(colId, content = '', tagText = null) {
   _addLongPress(bodyEl,   id);
   tagBarEl.addEventListener('mousedown',   () => _setActive(id));
   editorEl.addEventListener('mousedown',   () => _setActive(id));
+  overlayEl.addEventListener('mousedown',   () => _setActive(id));
   editorEl.addEventListener('input',       () => {
     if (!_suppressDirtyFor.has(id)) _markDirty(id);
     clearTimeout(pane._changeTimer);
     pane._changeTimer = setTimeout(() => emit('change', pane), 150);
+    pane.clearOverlays();
   });
 
   bodyEl.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
@@ -537,13 +554,21 @@ export function createPane(colId, content = '', tagText = null) {
 
   pane = {
     id, colId, el, tagBarEl, filenameEl, dirtyEl, lockEl, tagEl, bodyEl, editorEl, jar, lineNumEl,
+    editorWrap, overlayEl,
+    overlays: new Map(), _ovId: 0,
     mode: 'edit', savedContent: null,
     dirty: false, fileHandle: null, filename: null,
     plotOutputId: null, evalOutputId: null,
     showLineNums: false, showRuler: false, fontSize: null, locked: false,
     highlightLang: null,
     setHighlight: fn => { _extraHighlight = fn; },
+    addOverlay: opts => addOverlay(pane, opts),
+    clearOverlays: () => clearOverlays(pane),
+    removeOverlay: id => removeOverlay(pane, id),
   };
+  pane._ro = new ResizeObserver(() => refreshOverlays(pane));
+  pane._ro.observe(editorWrap);
+
   _panes.set(id, pane);
   _setActive(id);
   emit('newpane', pane);
@@ -558,6 +583,7 @@ export function deletePane(paneId) {
   const colId = pane.colId;
   const col   = _cols.get(colId);
 
+  pane._ro?.disconnect();
   pane.el.remove();
   _panes.delete(paneId);
   if (col) col.paneIds = col.paneIds.filter(id => id !== paneId);
@@ -710,7 +736,7 @@ export function setPaneDisplay(paneId, html) {
   const pane = _panes.get(paneId);
   if (!pane) return;
   pane.transient = true;
-  pane.editorEl.style.display = 'none';
+  pane.editorWrap.style.display = 'none';
   let el = pane.bodyEl.querySelector('.pane-display');
   if (!el) {
     el = document.createElement('div');

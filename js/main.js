@@ -584,7 +584,7 @@ function _buildToc(srcPane, silent = false) {
 
   // Mark as transient so state serialisation skips it.
   tocPane.transient = true;
-  tocPane.editorEl.style.display = 'none';
+  tocPane.editorWrap.style.display = 'none';
 
   let displayEl = tocPane.bodyEl.querySelector('.pane-display');
   if (!displayEl) {
@@ -1139,15 +1139,20 @@ _init();
 
 // ── Public extension API ───────────────────────────────────────────────────────
 
-function _editorHandle(pane, selection = null) {
+function _editorHandle(pane, selection = null, overlay = null) {
   return {
     getText: () => pane.jar.toString(),
     setText: text => pane.jar.updateCode(text),
     getSelection: () => selection ?? window.getSelection?.()?.toString().trim() ?? '',
+    getOverlay: () => overlay,
     setTag: label => { pane.tagEl.textContent = label; },
     setDisplay: html => setPaneDisplay(pane.id, html),
     getFilename: () => getPaneFile(pane.id)?.name ?? null,
+    getId: () => pane.id,
     focus: () => pane.editorEl.focus(),
+    addOverlay(opts) { return pane.addOverlay(opts); },
+    clearOverlays() { pane.clearOverlays(); },
+    removeOverlay(id) { pane.removeOverlay(id); },
     split(key, tag = '') {
       const storeKey = '__ext_' + key;
       let outId = pane[storeKey];
@@ -1205,7 +1210,7 @@ let _remoteUnsub = null;
 
 window.dunno = {
   register(cmd, fn) {
-    register(cmd, ctx => fn(_editorHandle(ctx.pane, ctx.selection)));
+    register(cmd, ctx => fn(_editorHandle(ctx.pane, ctx.selection, ctx.overlay)));
   },
   getActiveEditor() {
     const pane = getActive();

@@ -1,4 +1,4 @@
-const CACHE = 'dunno-0.10.0';
+const CACHE = 'dunno-0.11.0';
 const ASSETS = [
   './', './index.html', './css/app.css',
   './js/main.js', './js/tiling.js', './js/commands.js', './js/diff.js',

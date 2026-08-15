@@ -18,7 +18,12 @@ dunno is a tiled text editor. Right-clicking any word in a pane fires it as a co
 | `editor.setTag(label)` | Sets the tag bar text of this pane. |
 | `editor.setDisplay(html)` | Renders HTML into this pane, replacing the editable content (same as Preview/Plot). |
 | `editor.getFilename()` | Returns the filename associated with this pane, or `null`. |
+| `editor.getId()` | Returns the stable pane identifier (same `id` sent in remote events). |
+| `editor.getOverlay()` | Returns the overlay that was hovered when a command was triggered from a tooltip, or `null`. Contains `{id, start, end, className, tooltip}`. |
 | `editor.focus()` | Moves keyboard focus to this pane. |
+| `editor.addOverlay({start, end, className?, tooltip?})` | Adds a visual overlay (highlight / underline) on text range `start…end`. Returns an overlay id. |
+| `editor.clearOverlays()` | Removes all overlays from the pane. |
+| `editor.removeOverlay(id)` | Removes a single overlay by id. |
 | `editor.split(key, tag?)` | Returns an editor handle for a persistent output pane in the same column (horizontal split). Creates on first call; reuses on subsequent calls. `key` is a string scoped to the source pane. `tag` sets the tag bar label. |
 | `editor.splitLeft(key, tag?)` | Like `split`, but creates a new column to the left of the source pane's column. |
 | `editor.splitRight(key, tag?)` | Like `split`, but creates a new column to the right of the source pane's column. |
@@ -46,6 +51,25 @@ dunno.register('Shout', editor => {
   const sel = editor.getSelection();
   editor.setText(sel ? sel.toUpperCase() : editor.getText().toUpperCase());
   dunno.toast('Done');
+});
+```
+
+### Add visual overlays (lint / diagnostic hints)
+
+1. Call `editor.addOverlay({ start, end, className, tooltip })`.
+2. `className` can be any CSS class. Built-ins: `ov-error`, `ov-warning`, `ov-info`.
+3. `tooltip` is plain text shown on hover — any word in it is right-clickable just like normal pane text.
+4. A command triggered from a tooltip receives the overlay via `editor.getOverlay()` so it knows which range it refers to.
+5. `editor.getId()` gives the pane identifier — use it with `editor.getFilename()` to tell a backend exactly which file and range to fix.
+5. Overlays auto-clear when the pane is edited (offsets go stale).
+6. Overlays auto-refresh on pane resize / reflow (column resize, font zoom, etc.).
+7. Re-add overlays in a `dunno.on('change', ...)` handler if you want live diagnostics.
+
+```js
+dunno.on('change', editor => {
+  editor.clearOverlays();
+  // e.g. push to a server and receive ranges back…
+  editor.addOverlay({ start: 42, end: 55, className: 'ov-error', tooltip: 'Fix formatting' });
 });
 ```
 

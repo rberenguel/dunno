@@ -307,6 +307,92 @@ html, body {
   overflow-y: visible !important;
 }
 
+/* ── Editor wrap & overlay layer ───────────────────────── */
+
+.editor-wrap {
+  position: relative;
+  min-height: 100%;
+}
+
+.pane-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-height: 100%;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.overlay-mark {
+  position: absolute;
+  pointer-events: auto;
+  box-sizing: border-box;
+  border-radius: 2px;
+}
+
+.ov-error {
+  background: rgba(255, 60, 60, 0.22);
+  border-bottom: 1.5px wavy rgba(255, 90, 90, 0.95);
+}
+
+.ov-warning {
+  background: rgba(255, 190, 40, 0.22);
+  border-bottom: 1.5px wavy rgba(255, 210, 60, 0.95);
+}
+
+.ov-info {
+  background: rgba(50, 150, 255, 0.22);
+  border-bottom: 1.5px wavy rgba(80, 170, 255, 0.95);
+}
+
+body.dark .ov-error {
+  background: rgba(255, 70, 70, 0.30);
+  border-bottom-color: rgba(255, 100, 100, 1);
+}
+
+body.dark .ov-warning {
+  background: rgba(255, 200, 50, 0.28);
+  border-bottom-color: rgba(255, 220, 80, 1);
+}
+
+body.dark .ov-info {
+  background: rgba(60, 160, 255, 0.28);
+  border-bottom-color: rgba(90, 180, 255, 1);
+}
+
+.overlay-tooltip {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  left: 0;
+  top: calc(100% - 2px);
+  padding: 6px 10px;
+  background: var(--tag-bg);
+  color: var(--tag-fg);
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: normal;
+  word-break: break-word;
+  pointer-events: auto;
+  z-index: 5;
+  min-width: 200px;
+  max-width: 380px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: opacity 0.06s linear, visibility 0.06s linear;
+}
+
+body.dark .overlay-tooltip {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.overlay-mark:hover .overlay-tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+
 /* ── Line numbers ───────────────────────────────────────── */
 
 .line-gutter {
