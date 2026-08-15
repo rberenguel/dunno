@@ -2,6 +2,8 @@
 
 A tiled text editor inspired by Plan 9's Acme, with a gnuplot-compatible inline plotter, side-by-side diff, Markdown preview, and JS eval.
 
+![](https://raw.githubusercontent.com/rberenguel/dunno/refs/heads/gh-pages/dunno.jpeg)
+
 ## Running
 
 Open `index.html` from a local HTTP server (required for file I/O):
