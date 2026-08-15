@@ -921,3 +921,42 @@ body.dark .help-cmd { color: #aabbff; }
   writing-mode: vertical-rl;
   white-space: pre-line;
 }
+
+/* ── Plot tooltips ─────────────────────────────────────────────────────────── */
+
+.plot-tooltip {
+  position: fixed;
+  z-index: 1000;
+  background: rgba(15, 16, 32, 0.95);
+  color: #ccc;
+  border: 1px solid #44445a;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  pointer-events: none;
+  white-space: nowrap;
+  line-height: 1.4;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+.plot-tooltip[hidden] { display: none !important; }
+
+.plot-tooltip-color {
+  width: 100%;
+  height: 2px;
+  border-radius: 1px;
+  margin-bottom: 3px;
+}
+
+.plot-hit {
+  opacity: 0;
+  transition: opacity 0.05s;
+  pointer-events: all;
+  cursor: crosshair;
+}
+.plot-hit:hover {
+  opacity: 1;
+  fill: rgba(255,255,255,0.25);
+  stroke: #fff;
+  stroke-width: 1.5;
+}

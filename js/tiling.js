@@ -2,6 +2,7 @@ import { CodeJar }           from '../libs/codejar.js';
 import { isCommand, execute } from './commands.js';
 import { diffLines }          from './diff.js';
 import { makeHighlighter }    from './highlight.js';
+import { emit }               from './events.js';
 
 let _id = 0;
 const uid = () => String(++_id);
@@ -99,7 +100,9 @@ function _setActive(id) {
   if (_activeId) _panes.get(_activeId)?.el.classList.remove('active');
   _prevActiveId = _activeId;
   _activeId = id;
-  _panes.get(id)?.el.classList.add('active');
+  const pane = _panes.get(id);
+  pane?.el.classList.add('active');
+  if (pane) emit('activate', pane);
 }
 
 export const getActive   = () => _panes.get(_activeId);
@@ -518,7 +521,11 @@ export function createPane(colId, content = '', tagText = null) {
   _addLongPress(bodyEl,   id);
   tagBarEl.addEventListener('mousedown',   () => _setActive(id));
   editorEl.addEventListener('mousedown',   () => _setActive(id));
-  editorEl.addEventListener('input',       () => { if (!_suppressDirtyFor.has(id)) _markDirty(id); });
+  editorEl.addEventListener('input',       () => {
+    if (!_suppressDirtyFor.has(id)) _markDirty(id);
+    clearTimeout(pane._changeTimer);
+    pane._changeTimer = setTimeout(() => emit('change', pane), 150);
+  });
 
   bodyEl.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
   bodyEl.addEventListener('drop', e => {
@@ -539,6 +546,7 @@ export function createPane(colId, content = '', tagText = null) {
   };
   _panes.set(id, pane);
   _setActive(id);
+  emit('newpane', pane);
   return id;
 }
 
@@ -546,6 +554,7 @@ export function deletePane(paneId) {
   if (_panes.size <= 1) return;
   const pane = _panes.get(paneId);
   if (!pane) return;
+  emit('delpane', pane);
   const colId = pane.colId;
   const col   = _cols.get(colId);
 

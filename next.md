@@ -1,7 +1,8 @@
 # Next steps
 
-## 1. Plot improvements
+## Plot improvements
 
+Remaining from the original list:
 - `set logscale x` / `set logscale y` / `set logscale xy`
 - `set xtics` / `set ytics` for manual tick control
 - `smooth csplines` / `smooth bezier` — interpolate sparse data
@@ -10,18 +11,9 @@
 - Light-mode SVG colours (currently hardcoded dark)
 - Clamp lines at clip boundary rather than dropping whole segment
 
-## 2. Pane identity
+Already done: categorical / date x-axis, hover tooltips, PNG export.
 
-Allow the first word of the tag bar (before the command words) to serve as a pane name, so commands like `Diff` and `Plot` can reference panes by name rather than relying solely on "previously active":
-
-```
-data.csv  Del New Diff
-spec      Del New Plot
-```
-
-`plot "-" using 1:2` would still use the previously active pane for compatibility, but an explicit `plot "data.csv"` could look up the pane named `data.csv`.
-
-## 3. Autoload JS panes
+## Autoload JS panes
 
 A pane flagged as autoload would have its content eval'd on session restore, making plugins available immediately without manual right-click Eval.
 
@@ -34,7 +26,7 @@ Hook point is `_onPaneRestored` in `main.js`, which already handles per-pane sta
 - Should autoload panes run in a restricted scope or full `window` access? (Full access is needed for `dunno.register` to work.)
 - Should errors in autoload panes surface as toasts, or silently log to console?
 
-## 4. Bulk file loading / folder loading
+## Bulk file loading / folder loading
 
 `showOpenFilePicker` already accepts `multiple: true` — a `LoadAll` command could open several files at once, each into its own pane. `showDirectoryPicker` (Chrome/Edge) could load an entire folder, filtering by extension (e.g. `.js` for plugin directories).
 
@@ -45,30 +37,18 @@ Combined with autoload, a workflow emerges: pick a plugins folder, load all `.js
 - Should `LoadAll` create panes in the current column or spread across new columns?
 - Folder loading should probably filter by extension — configurable via selection (e.g. select `js` then right-click `LoadDir`)?
 
-## 5. Extension event system
+---
 
-Plugins registered via `dunno.register` only run on demand (right-click). A live plugin — one that updates its output as the user moves around — needs to subscribe to pane lifecycle events.
+## Done
 
-### Proposed API
+### Extension event system
 
-```js
-dunno.on('activate', editor => { /* pane gained focus */ })
-dunno.on('change',   editor => { /* pane content changed */ })
-dunno.on('theme',    isDark  => { /* dark/light toggled */ })
-dunno.off('activate', fn)
-```
+Built: `js/events.js` bus, nine events (`activate`, `change`, `newpane`, `delpane`, `theme`, `command`, `save`, `load`, `tab`), 150 ms debounce on `change`, wildcard `*` support, `dunno.on`/`dunno.off` returning unsubscribe functions.
 
-### Implementation sketch
+### Remote event bridge
 
-A small internal emitter (new `js/events.js` or inline in `tiling.js`) fires at existing hook points:
+Built: `js/remote.js` WebSocket client with auto-reconnect (3s → 30s). `dunno.remote(url)` auto-forwards all events as JSON metadata. `dunno.remoteSend(obj)` for one-off messages. `dunno.remoteOff()` to disconnect.
 
-- `activate` — end of `_setActive` in `tiling.js`
-- `change` — the `input` listener already on `editorEl`
-- `theme` — wherever `dark`/`light` commands toggle `body.classList`
+### Plot categorical x-axis
 
-`main.js` wraps the emitter behind `dunno.on` / `dunno.off`; listeners receive an editor handle via `_editorHandle`, never the raw pane.
-
-### Open questions
-
-- `change` fires on every keystroke — should dunno debounce internally (e.g. 300 ms) or leave it to the plugin?
-- Should `on` return an unsubscribe function in addition to `off`?
+Auto-detects non-numeric x-columns (dates, names), places points by row index, renders 60° slanted tick labels with extra bottom margin so labels sit outside the plot area.

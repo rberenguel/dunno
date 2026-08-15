@@ -23,6 +23,11 @@ dunno is a tiled text editor. Right-clicking any word in a pane fires it as a co
 | `editor.splitLeft(key, tag?)` | Like `split`, but creates a new column to the left of the source pane's column. |
 | `editor.splitRight(key, tag?)` | Like `split`, but creates a new column to the right of the source pane's column. |
 | `dunno.isDark()` | Returns `true` if the dark theme is active. |
+| `dunno.on(event, fn)` | Subscribe to a lifecycle event. Returns an unsubscribe function. |
+| `dunno.off(event, fn)` | Remove a listener registered with `dunno.on`. |
+| `dunno.remote(url)` | Open a WebSocket and auto-forward all events as JSON. |
+| `dunno.remoteSend(obj)` | Send a one-off JSON message over the remote socket. |
+| `dunno.remoteOff()` | Close the remote socket and stop auto-forwarding. |
 
 Command names are case-insensitive. A registered name that matches a built-in overwrites it.
 
@@ -83,3 +88,52 @@ dunno.register('Diff2', editor => {
 const ed = dunno.getActiveEditor();
 if (ed) ed.setText(ed.getText().trim());
 ```
+
+### Subscribe to lifecycle events
+
+1. Call `dunno.on(event, fn)` — `fn` receives an editor handle for pane events, or a raw value for `theme`.
+2. Store the returned function and call it to unsubscribe.
+3. Or call `dunno.off(event, fn)` with the original function.
+
+| Event | Payload | Description |
+|---|---|---|
+| `activate` | `editor` | Pane gained focus. |
+| `change` | `editor` | Pane content changed (150 ms debounce). |
+| `newpane` | `editor` | New pane created. |
+| `delpane` | `editor` | Pane destroyed (fires before DOM removal). |
+| `theme` | `isDark` | `true` = dark, `false` = light. |
+| `command` | `(name, editor)` | After any command executes (built-in or registered). |
+| `save` | `editor` | Pane saved to file (after write succeeds). |
+| `load` | `editor` | File loaded into pane (after read succeeds). |
+| `tab` | `(index, label)` | Workspace tab switched. |
+
+```js
+const unsub = dunno.on('change', editor => {
+  if (editor.getFilename() === 'notes.md') {
+    const html = window.marked.parse(editor.getText());
+    editor.split('preview', 'preview Del').setDisplay(html);
+  }
+});
+
+// Later: remove listener
+unsub();
+```
+
+### Forward events to a server
+
+1. Call `dunno.remote(url)` with a WebSocket URL.
+2. Every dunno event is serialized and sent automatically.
+3. The server receives JSON with metadata (pane id, filename, tag, text length) — not full text, to avoid flooding.
+4. Call `dunno.remoteOff()` to disconnect.
+
+```js
+dunno.remote('wss://localhost:8080/dunno');
+
+// Server sees:
+// {event: 'save', pane: {id: '7', filename: 'main.go', tag: 'Del', textLength: 1420}}
+// {event: 'theme', isDark: true}
+// {event: 'command', name: 'Save', pane: {id: '7', ...}}
+```
+
+The socket auto-reconnects with exponential backoff (3s → 30s max).
+Silently no-op if WebSocket is unavailable.

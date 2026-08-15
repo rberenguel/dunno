@@ -57,6 +57,11 @@ const SECTIONS = [
     { cmd: 'Split',  desc: 'Split pane content at cursor' },
     { cmd: 'Lock',   desc: 'Toggle read-only for this pane' },
   ]},
+  { heading: 'Plugin API', items: [
+    { cmd: 'dunno.register', desc: 'Add a right-click command' },
+    { cmd: 'dunno.on',       desc: 'Subscribe to editor events (see Help → events)' },
+    { cmd: 'dunno.remote',   desc: 'Forward all events to a WebSocket server' },
+  ]},
   { heading: 'Keyboard', items: [
     { cmd: '⌘S / Ctrl+S', desc: 'Save session to localStorage' },
   ]},
@@ -230,9 +235,13 @@ Lock again to unlock. The lock state persists across sessions.`,
 
   export: {
     title: 'Export',
-    body: `Export dumps all workspace tabs as JSON into a split pane.
+    body: `Export is contextual.
 
-You can save the JSON to a file, email it, or gist it. Use Import
+<b>Plot pane</b>: right-click Export on a plot output to save the
+chart as a PNG (rasterised at 2× scale).
+
+<b>Regular pane</b>: Export dumps all workspace tabs as JSON into a
+split pane. You can save the JSON, email it, or gist it. Use Import
 to restore the exact same layout later.`,
   },
 
@@ -293,6 +302,25 @@ using the previously active pane as the data source.
 <b>Styles</b>
   lines  points  linespoints  dots  impulses
   boxes  bars  area  steps
+
+<b>Export</b>
+  The output pane is tagged <span class="help-cmd">Export Del</span>.
+  Right-click <b>Export</b> on the plot output to save it as a PNG
+  (rasterised at 2× scale). On desktop a save picker is offered;
+  on mobile the share sheet is used.
+
+<b>Tooltips</b>
+  Hover over any data point to see its exact x, y value and the
+  series title. A white halo highlights the point under the cursor.
+  Works for all styles.
+
+<b>Date / categorical x-axis</b>
+  If the x-column contains non-numeric values (dates, names, etc.),
+  the axis is treated as categorical: points are placed by row index
+  and the original strings are shown as 60° slanted tick labels.
+  No extra syntax needed — just put dates in column 1 and use
+  <span class="help-cmd">using 1:2</span> as usual.
+  Tooltips show the original string, not the index.
 
 <b>Minimal example</b> (put in one pane, data in another)
   set title "Sine"
@@ -559,6 +587,62 @@ Replace opens the same bar with an additional replacement field.
 
 Matches are highlighted in the right-side gutter.
 Search is case-insensitive string matching.`,
+  },
+
+  events: {
+    title: 'Events',
+    body: `Live plugins can subscribe to dunno lifecycle events.
+
+<b>API</b>
+  dunno.on('activate', editor => { /* pane gained focus */ })
+  dunno.on('change',   editor => { /* pane content changed (150 ms debounce) */ })
+  dunno.on('theme',    isDark  => { /* dark / light toggled */ })
+  dunno.on('newpane',  editor => { /* pane created */ })
+  dunno.on('delpane',  editor => { /* pane destroyed */ })
+  dunno.on('command',  (name, editor) => { /* after any command */ })
+  dunno.on('save',     editor => { /* pane saved to file */ })
+  dunno.on('load',     editor => { /* file loaded into pane */ })
+  dunno.on('tab',      (idx, label) => { /* workspace tab switched */ })
+
+<b>Unsubscribe</b>
+  const unsub = dunno.on('change', fn)
+  unsub()                          // remove listener
+  dunno.off('change', fn)           // same thing
+
+Pane events (activate, change, newpane, delpane, save, load) pass an
+editor handle with getText, setText, getSelection, setTag, setDisplay,
+getFilename, focus, split, splitLeft, splitRight.
+
+command passes (name, editor) — name is the command string.
+theme passes a boolean: true = dark, false = light.
+tab passes (index, label).
+
+All listener errors are caught and logged to console so a broken plugin
+doesn't crash the editor.`,
+  },
+
+  remote: {
+    title: 'Remote',
+    body: `dunno.remote(url) opens a WebSocket and forwards every event to
+a server as JSON. Useful for CI hooks, presence, or live collaboration.
+
+<b>API</b>
+  dunno.remote('wss://localhost:8080/dunno')   // start forwarding
+  dunno.remoteSend({type: 'ping'})             // send a one-off message
+  dunno.remoteOff()                             // disconnect and stop forwarding
+
+<b>Auto-forwarded events</b>
+  Every dunno event is sent as JSON with metadata only (pane id, filename,
+  tag, text length). Full text is not sent automatically to avoid flooding.
+
+  Example payloads:
+    {event: 'save', pane: {id: '7', filename: 'main.go', tag: 'Del', textLength: 1420}}
+    {event: 'theme', isDark: true}
+    {event: 'tab', index: 2, label: 'backend'}
+
+<b>Reconnect</b>
+  The socket auto-reconnects with exponential backoff (3s → 30s max).
+  No-op if WebSocket is unavailable (file://, old browsers).`,
   },
 };
 

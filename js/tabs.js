@@ -68,10 +68,13 @@ export function closeTab(idx) {
   return true;
 }
 
+import { emit } from './events.js';
+
 export function switchTab(idx) {
   if (idx === _active) return;
   _active = idx;
   _render();
+  emit('tab', idx, _meta[idx]?.label ?? '');
 }
 
 export function saveActiveState(state) {

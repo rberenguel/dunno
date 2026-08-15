@@ -107,8 +107,8 @@ function _parseData(text, separator) {
 
   const raw = lines.map(split);
   let headers = [], rows = raw;
-  if (raw[0].some(v => v && isNaN(+v))) { headers = raw[0]; rows = raw.slice(1); }
-  return { headers, rows: rows.map(r => r.map(Number)) };
+  if (raw[0].every(v => v && isNaN(+v))) { headers = raw[0]; rows = raw.slice(1); }
+  return { headers, rows: rows.map(r => r.map(Number)), rawRows: rows };
 }
 
 // ── SVG renderer ───────────────────────────────────────────────────────────────
@@ -119,14 +119,33 @@ const PW = VW - M.left - M.right;
 const PH = VH - M.top  - M.bottom;
 
 export function renderSVG(spec, dataText) {
-  const { rows } = _parseData(dataText, spec.separator);
+  const { rows, rawRows } = _parseData(dataText, spec.separator);
   if (!rows.length) return _err('No data');
+
+  // Detect categorical x-axis (non-numeric strings in any series' x column)
+  let categoricalLabels = null;
+  for (const s of spec.series) {
+    if (s.using[0] === 0) continue;
+    const xCol = s.using[0] - 1;
+    if (rawRows.length > 0 && rawRows[0][xCol] != null) {
+      if (isNaN(Number(rawRows[0][xCol]))) {
+        categoricalLabels = rawRows.map(r => r[xCol]);
+        break;
+      }
+    }
+  }
+
+  // Categorical plots need a deeper bottom margin so 60° labels sit outside
+  // the plot area instead of overlapping it.
+  const bottomM = categoricalLabels ? 90 : M.bottom;
+  const vh = categoricalLabels ? 520 : VH;
+  const ph = vh - M.top - bottomM;
 
   // Collect all X and Y values across series to compute domains
   const allX = [], allY = [];
   for (const s of spec.series) {
     rows.forEach((row, ri) => {
-      const x = s.using[0] === 0 ? ri + 1 : row[s.using[0] - 1];
+      const x = s.using[0] === 0 ? ri + 1 : (categoricalLabels !== null ? ri : row[s.using[0] - 1]);
       const y = row[s.using[1] - 1];
       if (isFinite(x)) allX.push(x);
       if (isFinite(y)) allY.push(y);
@@ -137,9 +156,9 @@ export function renderSVG(spec, dataText) {
   const xd = _domain(allX, spec.xrange, false);
   const yd = _domain(allY, spec.yrange, _needsZero(spec));
   const xs = v => (v - xd[0]) / (xd[1] - xd[0]) * PW;
-  const ys = v => PH - (v - yd[0]) / (yd[1] - yd[0]) * PH;
+  const ys = v => ph - (v - yd[0]) / (yd[1] - yd[0]) * ph;
 
-  const xTicks = _ticks(...xd);
+  const xTicks = categoricalLabels ? _categoricalTicks(categoricalLabels.length) : _ticks(...xd);
   const yTicks = _ticks(...yd);
 
   let g = '';
@@ -147,50 +166,61 @@ export function renderSVG(spec, dataText) {
   // Grid
   if (spec.grid) {
     for (const t of xTicks)
-      g += `<line x1="${f(xs(t))}" y1="0" x2="${f(xs(t))}" y2="${PH}" stroke="#1e1e3a" stroke-width="1"/>`;
+      g += `<line x1="${f(xs(t))}" y1="0" x2="${f(xs(t))}" y2="${ph}" stroke="#1e1e3a" stroke-width="1"/>`;
     for (const t of yTicks)
       g += `<line x1="0" y1="${f(ys(t))}" x2="${PW}" y2="${f(ys(t))}" stroke="#1e1e3a" stroke-width="1"/>`;
   }
 
   // Zero lines (if in range)
   if (xd[0] < 0 && xd[1] > 0)
-    g += `<line x1="${f(xs(0))}" y1="0" x2="${f(xs(0))}" y2="${PH}" stroke="#44445a" stroke-width="1"/>`;
+    g += `<line x1="${f(xs(0))}" y1="0" x2="${f(xs(0))}" y2="${ph}" stroke="#44445a" stroke-width="1"/>`;
   if (yd[0] < 0 && yd[1] > 0)
     g += `<line x1="0" y1="${f(ys(0))}" x2="${PW}" y2="${f(ys(0))}" stroke="#44445a" stroke-width="1"/>`;
 
-  // Series (clipped)
-  g += `<g clip-path="url(#pa)">`;
+  // Series (clipped) — visuals first, then a unified hit layer so no series
+  // occludes another's interactive targets.
+  let seriesG = '';
+  let hitsG   = '';
   spec.series.forEach((s, i) => {
     const color = COLORS[i % COLORS.length];
     const pts = rows.map((row, ri) => [
-      s.using[0] === 0 ? ri + 1 : row[s.using[0] - 1],
+      s.using[0] === 0 ? ri + 1 : (categoricalLabels !== null ? ri : row[s.using[0] - 1]),
       row[s.using[1] - 1],
     ]).filter(([x, y]) => isFinite(x) && isFinite(y));
-    g += _renderSeries(pts, s.style, color, xs, ys);
+    seriesG += _renderSeries(pts, s.style, color, xs, ys);
+    hitsG   += _renderHits(pts, xs, ys, s, color, categoricalLabels);
   });
-  g += '</g>';
+  g += `<g clip-path="url(#pa)">${seriesG}${hitsG}</g>`;
 
   // Axes
-  g += `<line x1="0" y1="0" x2="0" y2="${PH}" stroke="#7777aa" stroke-width="1.5"/>`;
-  g += `<line x1="0" y1="${PH}" x2="${PW}" y2="${PH}" stroke="#7777aa" stroke-width="1.5"/>`;
+  g += `<line x1="0" y1="0" x2="0" y2="${ph}" stroke="#7777aa" stroke-width="1.5"/>`;
+  g += `<line x1="0" y1="${ph}" x2="${PW}" y2="${ph}" stroke="#7777aa" stroke-width="1.5"/>`;
 
   // X ticks + labels
-  for (const t of xTicks) {
-    const x = xs(t); if (x < -1 || x > PW + 1) continue;
-    g += `<line x1="${f(x)}" y1="${PH}" x2="${f(x)}" y2="${PH + 5}" stroke="#7777aa"/>`;
-    g += `<text x="${f(x)}" y="${PH + 18}" text-anchor="middle" fill="#8888aa" font-size="11" font-family="monospace">${_ft(t)}</text>`;
+  if (categoricalLabels) {
+    for (const t of xTicks) {
+      const x = xs(t); if (x < -1 || x > PW + 1) continue;
+      g += `<line x1="${f(x)}" y1="${ph}" x2="${f(x)}" y2="${ph + 5}" stroke="#7777aa"/>`;
+      g += `<text x="${f(x)}" y="${ph + 50}" text-anchor="middle" fill="#8888aa" font-size="9" font-family="monospace" transform="rotate(-60, ${f(x)}, ${ph + 50})">${_e(categoricalLabels[t])}</text>`;
+    }
+  } else {
+    for (const t of xTicks) {
+      const x = xs(t); if (x < -1 || x > PW + 1) continue;
+      g += `<line x1="${f(x)}" y1="${ph}" x2="${f(x)}" y2="${ph + 5}" stroke="#7777aa"/>`;
+      g += `<text x="${f(x)}" y="${ph + 18}" text-anchor="middle" fill="#8888aa" font-size="11" font-family="monospace">${_ft(t)}</text>`;
+    }
   }
 
   // Y ticks + labels
   for (const t of yTicks) {
-    const y = ys(t); if (y < -1 || y > PH + 1) continue;
+    const y = ys(t); if (y < -1 || y > ph + 1) continue;
     g += `<line x1="-5" y1="${f(y)}" x2="0" y2="${f(y)}" stroke="#7777aa"/>`;
     g += `<text x="-8" y="${f(y + 4)}" text-anchor="end" fill="#8888aa" font-size="11" font-family="monospace">${_ft(t)}</text>`;
   }
 
   // Axis labels
-  if (spec.xlabel) g += `<text x="${PW/2}" y="${PH+44}" text-anchor="middle" fill="#aaaacc" font-size="13" font-family="sans-serif">${_e(spec.xlabel)}</text>`;
-  if (spec.ylabel) g += `<text x="${-PH/2}" y="-50" text-anchor="middle" fill="#aaaacc" font-size="13" font-family="sans-serif" transform="rotate(-90)">${_e(spec.ylabel)}</text>`;
+  if (!categoricalLabels && spec.xlabel) g += `<text x="${PW/2}" y="${ph+44}" text-anchor="middle" fill="#aaaacc" font-size="13" font-family="sans-serif">${_e(spec.xlabel)}</text>`;
+  if (spec.ylabel) g += `<text x="${-ph/2}" y="-50" text-anchor="middle" fill="#aaaacc" font-size="13" font-family="sans-serif" transform="rotate(-90)">${_e(spec.ylabel)}</text>`;
   if (spec.title)  g += `<text x="${PW/2}" y="-14" text-anchor="middle" fill="#ddddff" font-size="15" font-weight="bold" font-family="sans-serif">${_e(spec.title)}</text>`;
 
   // Legend
@@ -204,14 +234,22 @@ export function renderSVG(spec, dataText) {
     });
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VW} ${VH}" preserveAspectRatio="xMidYMid meet">
-<rect width="${VW}" height="${VH}" fill="#0d0e1a"/>
-<defs><clipPath id="pa"><rect x="0" y="0" width="${PW}" height="${PH}"/></clipPath></defs>
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VW} ${vh}" preserveAspectRatio="xMidYMid meet">
+<rect width="${VW}" height="${vh}" fill="#0d0e1a"/>
+<defs><clipPath id="pa"><rect x="0" y="0" width="${PW}" height="${ph}"/></clipPath></defs>
 <g transform="translate(${M.left},${M.top})">${g}</g>
 </svg>`;
 }
 
 // ── Series renderers ───────────────────────────────────────────────────────────
+
+function _renderHits(pts, xs, ys, ser, color, catLabels) {
+  if (!pts.length) return '';
+  return pts.map(([x, y]) => {
+    const xVal = catLabels ? (catLabels[x] ?? String(x)) : _ft(x);
+    return `<circle class="plot-hit" data-color="${color}" data-x="${_e(xVal)}" data-y="${_ft(y)}" data-series="${_e(ser?.title || 'Series')}" cx="${f(xs(x))}" cy="${f(ys(y))}" r="5" fill="transparent" stroke="none"/>`;
+  }).join('');
+}
 
 function _renderSeries(pts, style, color, xs, ys) {
   if (!pts.length) return '';
@@ -293,6 +331,15 @@ function _ticks(lo, hi, n = 5) {
   return out;
 }
 
+function _categoricalTicks(n, maxTicks = 20) {
+  if (n <= maxTicks) return Array.from({length: n}, (_, i) => i);
+  const step = Math.ceil(n / maxTicks);
+  const out = [];
+  for (let i = 0; i < n; i += step) out.push(i);
+  if (out[out.length - 1] !== n - 1) out.push(n - 1);
+  return out;
+}
+
 function _ft(v) {
   if (v === 0) return '0';
   const a = Math.abs(v);
@@ -305,4 +352,27 @@ function _e(s) {
 
 function _err(msg) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 80"><rect width="400" height="80" fill="#0d0e1a"/><text x="200" y="45" text-anchor="middle" fill="#ff6644" font-size="14" font-family="sans-serif">${_e(msg)}</text></svg>`;
+}
+
+// ── PNG export ─────────────────────────────────────────────────────────────────
+
+export function exportPlotToPNG(svgString, scale = 2) {
+  return new Promise((resolve, reject) => {
+    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = VW * scale;
+      canvas.height = VH * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#0d0e1a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(b => resolve(b), 'image/png');
+    };
+    img.onerror = err => { URL.revokeObjectURL(url); reject(err); };
+    img.src = url;
+  });
 }

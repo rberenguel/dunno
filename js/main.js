@@ -27,7 +27,9 @@ import {
   getActiveIndex,
 } from './tabs.js';
 import { register } from './commands.js';
-import { parsePlotSpec, renderSVG } from './plot.js';
+import { parsePlotSpec, renderSVG, exportPlotToPNG } from './plot.js';
+import { on, off, emit } from './events.js';
+import { remoteConnect, remoteSend as _remoteSend, remoteDisconnect } from './remote.js';
 import { openFind, openReplace } from './find.js';
 import { renderPreviewHTML } from './preview.js';
 import { formatSource, resolveParser } from './format.js';
@@ -362,7 +364,36 @@ register('Highlight', ctx => {
 
 // ── Session ───────────────────────────────────────────────────────────────────
 
-register('Export', ctx => {
+register('Export', async ctx => {
+  // Contextual: if this pane contains a plot SVG, export it as PNG.
+  const svgEl = ctx.pane.bodyEl.querySelector('.pane-display svg');
+  if (svgEl) {
+    try {
+      const blob = await exportPlotToPNG(svgEl.outerHTML);
+      const file = new File([blob], 'plot.png', { type: 'image/png' });
+      if (window.showSaveFilePicker) {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: 'plot.png',
+          types: [{ description: 'PNG image', accept: { 'image/png': ['.png'] } }],
+        });
+        const w = await handle.createWritable();
+        await w.write(file);
+        await w.close();
+      } else if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file] });
+      } else {
+        const url = URL.createObjectURL(file);
+        const a = Object.assign(document.createElement('a'), { href: url, download: 'plot.png' });
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (e) {
+      if (e.name !== 'AbortError') _toast('Export error: ' + e.message);
+    }
+    return;
+  }
+
+  // Otherwise: dump all workspace tabs as JSON.
   saveActiveState(getState());
   saveAll();
   const all = getAllStates().map(s => ({ label: s.label, state: s.state }));
@@ -408,8 +439,8 @@ function _syncThemeColor() {
     ?.setAttribute('content', dark ? '#0f1020' : '#dde3ff');
 }
 
-register('dark',  () => { document.body.classList.add('dark');    _syncThemeColor(); });
-register('light', () => { document.body.classList.remove('dark'); _syncThemeColor(); });
+register('dark',  () => { document.body.classList.add('dark');    _syncThemeColor(); emit('theme', true); });
+register('light', () => { document.body.classList.remove('dark'); _syncThemeColor(); emit('theme', false); });
 
 // ── File I/O ───────────────────────────────────────────────────────────────────
 
@@ -434,6 +465,7 @@ register('Load', async ctx => {
     const file = await handle.getFile();
     loadContent(ctx.paneId, await file.text());
     setPaneFile(ctx.paneId, handle, file.name);
+    emit('load', getPane(ctx.paneId));
   } catch (e) {
     if (e.name !== 'AbortError') console.error(e);
   }
@@ -455,11 +487,13 @@ register('Save', async ctx => {
     _downloadBlob(ctx.paneId);
   }
   _sessionSave();
+  emit('save', getPane(ctx.paneId));
 });
 
 setFileDropHandler(async (paneId, file) => {
   loadContent(paneId, await file.text());
   setPaneFile(paneId, null, file.name);
+  emit('load', getPane(paneId));
 });
 
 register('Get', async ctx => {
@@ -490,6 +524,7 @@ async function _writeToHandle(paneId, handle) {
     await w.write(pane.jar.toString());
     await w.close();
     clearDirty(paneId);
+    emit('save', pane);
   } catch (e) { console.error(e); }
 }
 
@@ -714,6 +749,53 @@ register('Eval', ctx => {
 
 // ── Plot ───────────────────────────────────────────────────────────────────────
 
+function _showPlotTooltip(series, x, y, color, clientX, clientY) {
+  let el = document.getElementById('plot-tooltip');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'plot-tooltip';
+    el.className = 'plot-tooltip';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = '';
+  const line = document.createElement('div');
+  line.className = 'plot-tooltip-color';
+  line.style.background = color;
+  el.appendChild(line);
+  const b = document.createElement('b');
+  b.textContent = series;
+  el.appendChild(b);
+  el.appendChild(document.createElement('br'));
+  el.appendChild(document.createTextNode('x: ' + x));
+  el.appendChild(document.createElement('br'));
+  el.appendChild(document.createTextNode('y: ' + y));
+  const rect = el.getBoundingClientRect();
+  let left = clientX + 12;
+  let top = clientY - rect.height - 8;
+  if (left + rect.width > window.innerWidth) left = clientX - rect.width - 12;
+  if (top < 0) top = clientY + 12;
+  el.style.left = left + 'px';
+  el.style.top = top + 'px';
+  el.hidden = false;
+}
+function _hidePlotTooltip() {
+  const el = document.getElementById('plot-tooltip');
+  if (el) el.hidden = true;
+}
+function _attachPlotTooltipListener(bodyEl) {
+  if (bodyEl._plotTooltipAttached) return;
+  bodyEl._plotTooltipAttached = true;
+  bodyEl.addEventListener('mousemove', e => {
+    const hit = e.target.closest('.plot-hit');
+    if (hit) {
+      _showPlotTooltip(hit.dataset.series, hit.dataset.x, hit.dataset.y, hit.dataset.color, e.clientX, e.clientY);
+    } else {
+      _hidePlotTooltip();
+    }
+  });
+  bodyEl.addEventListener('mouseleave', () => _hidePlotTooltip());
+}
+
 register('Plot', ctx => {
   const dataPane = getPrev();
   if (!dataPane || dataPane.id === ctx.paneId) return;
@@ -726,7 +808,10 @@ register('Plot', ctx => {
     outId = splitPane(ctx.paneId);
     ctx.pane.plotOutputId = outId;
     const out = getPane(outId);
-    if (out) out.tagEl.textContent = 'plot-out Del';
+    if (out) {
+      out.tagEl.textContent = 'Export Del';
+      _attachPlotTooltipListener(out.bodyEl);
+    }
   }
   setPaneDisplay(outId, svg);
 });
@@ -1103,6 +1188,21 @@ function _editorHandle(pane, selection = null) {
   };
 }
 
+// Events that pass a raw pane object need wrapping into an editor handle
+// before reaching the user's callback.
+const _PANE_EVENTS = new Set(['activate', 'change', 'newpane', 'delpane', 'save', 'load']);
+
+function _serializePane(pane) {
+  return {
+    id: pane.id,
+    filename: pane.filename || null,
+    tag: pane.tagEl?.textContent || null,
+    textLength: pane.jar?.toString().length || 0,
+  };
+}
+
+let _remoteUnsub = null;
+
 window.dunno = {
   register(cmd, fn) {
     register(cmd, ctx => fn(_editorHandle(ctx.pane, ctx.selection)));
@@ -1117,4 +1217,51 @@ window.dunno = {
   },
   toast: msg => _toast(msg),
   isDark: () => document.body.classList.contains('dark'),
+  on(event, fn) {
+    const wrapper = (...args) => {
+      if (event === 'command' && args[1]?.id != null) {
+        fn(args[0], _editorHandle(args[1]));
+      } else if (_PANE_EVENTS.has(event) && args[0]?.id != null) {
+        fn(_editorHandle(args[0]));
+      } else {
+        fn(...args);
+      }
+    };
+    if (!fn.__dunno_wrappers) fn.__dunno_wrappers = new Map();
+    fn.__dunno_wrappers.set(event, wrapper);
+    return on(event, wrapper);
+  },
+  off(event, fn) {
+    const wrapper = fn.__dunno_wrappers?.get(event);
+    if (wrapper) {
+      off(event, wrapper);
+      fn.__dunno_wrappers.delete(event);
+    }
+  },
+  remote(url) {
+    remoteConnect(url);
+    if (_remoteUnsub) { _remoteUnsub(); _remoteUnsub = null; }
+    _remoteUnsub = on('*', (event, ...args) => {
+      const payload = { event };
+      if (event === 'theme') {
+        payload.isDark = args[0];
+      } else if (event === 'tab') {
+        payload.index = args[0];
+        payload.label = args[1];
+      } else if (event === 'command') {
+        payload.name = args[0];
+        payload.pane = _serializePane(args[1]);
+      } else if (args[0]?.id != null) {
+        payload.pane = _serializePane(args[0]);
+      }
+      _remoteSend(payload);
+    });
+  },
+  remoteSend(obj) {
+    _remoteSend(obj);
+  },
+  remoteOff() {
+    if (_remoteUnsub) { _remoteUnsub(); _remoteUnsub = null; }
+    remoteDisconnect();
+  },
 };
