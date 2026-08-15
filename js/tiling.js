@@ -10,6 +10,53 @@ const uid = () => String(++_id);
 
 const _hesc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+// Replace markdown image syntax ![](data:...) with a visible <img> while keeping
+// the raw markdown in a hidden span so jar.toString() survives save/restore.
+function _renderInlineImages(editorEl) {
+  const regex = /!\[[^\]]*\]\(data:[^)]+\)/;
+  const walker = document.createTreeWalker(
+    editorEl,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: node => {
+        if (node.parentElement?.closest?.('.img-src')) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    }
+  );
+  let node;
+  while ((node = walker.nextNode())) {
+    const text = node.nodeValue;
+    const m = regex.exec(text);
+    if (!m) continue;
+
+    const raw = m[0];
+    const urlMatch = raw.match(/\((data:[^)]+)\)/);
+    if (!urlMatch) continue;
+
+    const range = document.createRange();
+    range.setStart(node, m.index);
+    range.setEnd(node, m.index + raw.length);
+    range.deleteContents();
+
+    const hidden = document.createElement('span');
+    hidden.className = 'img-src';
+    hidden.style.display = 'none';
+    hidden.textContent = raw;
+
+    const img = document.createElement('img');
+    img.src = urlMatch[1];
+    img.style.maxWidth = '100%';
+    img.style.maxHeight = '80vh';
+    img.style.display = 'inline-block';
+
+    range.insertNode(hidden);
+    range.insertNode(img);
+  }
+}
+
 const _cols  = new Map(); // id -> { id, el, paneIds }
 const _panes = new Map(); // id -> pane object
 let _colOrder     = [];
@@ -455,6 +502,10 @@ export function createPane(colId, content = '', tagText = null) {
   lockEl.textContent = '🔒';
   lockEl.hidden = true;
 
+  const statusEl = document.createElement('span');
+  statusEl.className = 'pane-status';
+  statusEl.hidden = true;
+
   tagEl.className       = 'pane-tag';
   tagEl.contentEditable = 'true';
   tagEl.spellcheck      = false;
@@ -479,6 +530,7 @@ export function createPane(colId, content = '', tagText = null) {
   tagBarEl.appendChild(filenameEl);
   tagBarEl.appendChild(dirtyEl);
   tagBarEl.appendChild(lockEl);
+  tagBarEl.appendChild(statusEl);
   tagBarEl.appendChild(tagEl);
   el.appendChild(tagBarEl);
   el.appendChild(bodyEl);
@@ -519,6 +571,7 @@ export function createPane(colId, content = '', tagText = null) {
       }
     }
     if (_extraHighlight) _extraHighlight(editor);
+    _renderInlineImages(editor);
     if (pane && pane.showLineNums) _updateLineNumbers();
   }
 
@@ -544,6 +597,47 @@ export function createPane(colId, content = '', tagText = null) {
     pane.clearOverlays();
   });
 
+  editorEl.addEventListener('paste', e => {
+    const files = e.clipboardData?.files;
+    if (!files || !files.length) return;
+    const img = Array.from(files).find(f => f.type.startsWith('image/'));
+    if (!img) return;
+    e.preventDefault();
+    const reader = new FileReader();
+    reader.onload = () => {
+      const tmp = new Image();
+      tmp.onload = () => {
+        const MAX = 1200;
+        let w = tmp.naturalWidth, h = tmp.naturalHeight;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        const cvs = document.createElement('canvas');
+        cvs.width = w; cvs.height = h;
+        cvs.getContext('2d').drawImage(tmp, 0, 0, w, h);
+        const dataUrl = cvs.toDataURL('image/jpeg', 0.92);
+        const md = `![](${dataUrl})`;
+        const sel = window.getSelection();
+        if (!sel.rangeCount) {
+          const text = pane.jar.toString();
+          pane.jar.updateCode(text + '\n\n' + md);
+          return;
+        }
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        const node = document.createTextNode(md);
+        range.insertNode(node);
+        range.setStartAfter(node);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      };
+      tmp.src = reader.result;
+    };
+    reader.readAsDataURL(img);
+  });
+
   bodyEl.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
   bodyEl.addEventListener('drop', e => {
     e.preventDefault();
@@ -552,8 +646,15 @@ export function createPane(colId, content = '', tagText = null) {
     if (file && _fileDropHandler) _fileDropHandler(id, file);
   });
 
+  const _status = new Map();
+  function _updateStatus() {
+    const parts = Array.from(_status.values()).filter(Boolean);
+    statusEl.textContent = parts.join(' · ');
+    statusEl.hidden = parts.length === 0;
+  }
+
   pane = {
-    id, colId, el, tagBarEl, filenameEl, dirtyEl, lockEl, tagEl, bodyEl, editorEl, jar, lineNumEl,
+    id, colId, el, tagBarEl, filenameEl, dirtyEl, lockEl, statusEl, tagEl, bodyEl, editorEl, jar, lineNumEl,
     editorWrap, overlayEl,
     overlays: new Map(), _ovId: 0,
     mode: 'edit', savedContent: null,
@@ -565,6 +666,9 @@ export function createPane(colId, content = '', tagText = null) {
     addOverlay: opts => addOverlay(pane, opts),
     clearOverlays: () => clearOverlays(pane),
     removeOverlay: id => removeOverlay(pane, id),
+    setStatus(key, text) { _status.set(key, text); _updateStatus(); },
+    clearStatus(key) { _status.delete(key); _updateStatus(); },
+    clearAllStatus() { _status.clear(); _updateStatus(); },
   };
   pane._ro = new ResizeObserver(() => refreshOverlays(pane));
   pane._ro.observe(editorWrap);

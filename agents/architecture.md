@@ -24,6 +24,9 @@ dunno is a tiled text editor. Right-clicking any word in a pane fires it as a co
 | `editor.addOverlay({start, end, className?, tooltip?})` | Adds a visual overlay (highlight / underline) on text range `start…end`. Returns an overlay id. |
 | `editor.clearOverlays()` | Removes all overlays from the pane. |
 | `editor.removeOverlay(id)` | Removes a single overlay by id. |
+| `editor.setStatus(key, text)` | Sets a keyed status fragment shown in the tag bar (e.g. `setStatus('lint', '3 errors')`). Multiple keys are joined with `·`. |
+| `editor.clearStatus(key)` | Removes a keyed status fragment. |
+| `editor.clearAllStatus()` | Clears all status fragments. |
 | `editor.split(key, tag?)` | Returns an editor handle for a persistent output pane in the same column (horizontal split). Creates on first call; reuses on subsequent calls. `key` is a string scoped to the source pane. `tag` sets the tag bar label. |
 | `editor.splitLeft(key, tag?)` | Like `split`, but creates a new column to the left of the source pane's column. |
 | `editor.splitRight(key, tag?)` | Like `split`, but creates a new column to the right of the source pane's column. |
@@ -54,6 +57,22 @@ dunno.register('Shout', editor => {
 });
 ```
 
+### Update the tag bar status area
+
+1. Call `editor.setStatus(key, text)` to show a status fragment in the tag bar.
+2. Multiple keys are joined with `·` so they don't overwrite each other.
+3. Status appears between the lock icon and the command tag — it never replaces the tag itself.
+4. Call `editor.clearStatus(key)` or `editor.clearAllStatus()` to remove.
+
+```js
+dunno.on('change', editor => {
+  editor.setStatus('lint', 'checking…');
+  // backend responds later…
+  editor.setStatus('lint', '3 errors');
+  editor.setStatus('type', 'go');
+});
+```
+
 ### Add visual overlays (lint / diagnostic hints)
 
 1. Call `editor.addOverlay({ start, end, className, tooltip })`.
@@ -61,9 +80,9 @@ dunno.register('Shout', editor => {
 3. `tooltip` is plain text shown on hover — any word in it is right-clickable just like normal pane text.
 4. A command triggered from a tooltip receives the overlay via `editor.getOverlay()` so it knows which range it refers to.
 5. `editor.getId()` gives the pane identifier — use it with `editor.getFilename()` to tell a backend exactly which file and range to fix.
-5. Overlays auto-clear when the pane is edited (offsets go stale).
-6. Overlays auto-refresh on pane resize / reflow (column resize, font zoom, etc.).
-7. Re-add overlays in a `dunno.on('change', ...)` handler if you want live diagnostics.
+6. Overlays auto-clear when the pane is edited (offsets go stale).
+7. Overlays auto-refresh on pane resize / reflow (column resize, font zoom, etc.).
+8. Re-add overlays in a `dunno.on('change', ...)` handler if you want live diagnostics.
 
 ```js
 dunno.on('change', editor => {

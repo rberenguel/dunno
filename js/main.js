@@ -1153,6 +1153,9 @@ function _editorHandle(pane, selection = null, overlay = null) {
     addOverlay(opts) { return pane.addOverlay(opts); },
     clearOverlays() { pane.clearOverlays(); },
     removeOverlay(id) { pane.removeOverlay(id); },
+    setStatus(key, text) { pane.setStatus(key, text); },
+    clearStatus(key) { pane.clearStatus(key); },
+    clearAllStatus() { pane.clearAllStatus(); },
     split(key, tag = '') {
       const storeKey = '__ext_' + key;
       let outId = pane[storeKey];

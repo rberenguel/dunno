@@ -451,6 +451,25 @@ body.dark .overlay-tooltip {
   display: none;
 }
 
+/* ── Status ─────────────────────────────────────────────── */
+
+.pane-status {
+  display: flex;
+  align-items: center;
+  padding: 3px 6px 3px 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--tag-fg);
+  opacity: 0.55;
+  white-space: nowrap;
+  user-select: none;
+  cursor: default;
+}
+
+.pane-status[hidden] {
+  display: none;
+}
+
 .pane.locked .editor {
   opacity: 0.55;
 }
