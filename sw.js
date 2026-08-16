@@ -1,8 +1,9 @@
-const CACHE = 'dunno-0.13.0';
+const CACHE = 'dunno-0.13.2';
 const ASSETS = [
   './', './index.html', './css/app.css',
   './js/main.js', './js/tiling.js', './js/commands.js', './js/diff.js',
   './js/prompt.js',
+  './icon.png',
   './libs/codejar.js',
 ];
 

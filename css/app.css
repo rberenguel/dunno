@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'Datatype';
+  src: url('../fonts/Datatype.woff2') format('woff2');
+  font-weight: 100 900;
+  font-stretch: 0% 100%;
+  font-display: swap;
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -312,6 +320,18 @@ html, body {
 .editor-wrap {
   position: relative;
   min-height: 100%;
+}
+
+/* ── Inline Datatype charts ─────────────────────────────── */
+
+.datatype-chart {
+  font-family: 'Datatype', var(--font-mono), sans-serif;
+  font-size: 1.4em;
+  font-variation-settings: 'wdth' 60;
+  white-space: nowrap;
+  line-height: 1.0;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .pane-overlay {

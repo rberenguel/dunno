@@ -50,6 +50,56 @@ func readManifestVersion(rootDir string) string {
 	return m.Version
 }
 
+// inlineCssUrls converts local `url(...)` references inside CSS text to
+// base64 data URIs so the woven single-file build carries fonts and images
+// referenced by stylesheets. Skips data: and http(s) URLs.
+func inlineCssUrls(css string, cssPath string, rootDir string) string {
+	cssDir := filepath.Dir(cssPath)
+	re := regexp.MustCompile(`url\(['"]?([^'"]+)['"]?\)`)
+	return re.ReplaceAllStringFunc(css, func(match string) string {
+		m := re.FindStringSubmatch(match)
+		if m == nil {
+			return match
+		}
+		url := m[1]
+		if strings.HasPrefix(url, "data:") || strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") || strings.HasPrefix(url, "//") {
+			return match
+		}
+		resolved := filepath.Clean(filepath.Join(cssDir, url))
+		absResolved, _ := filepath.Abs(resolved)
+		absRoot, _ := filepath.Abs(rootDir)
+		if !strings.HasPrefix(absResolved, absRoot) {
+			return match
+		}
+		if _, err := os.Stat(absResolved); err != nil {
+			return match
+		}
+		ext := strings.ToLower(filepath.Ext(url))
+		mime := "application/octet-stream"
+		switch ext {
+		case ".woff2":
+			mime = "font/woff2"
+		case ".woff":
+			mime = "font/woff"
+		case ".ttf":
+			mime = "font/ttf"
+		case ".otf":
+			mime = "font/otf"
+		case ".png":
+			mime = "image/png"
+		case ".jpg", ".jpeg":
+			mime = "image/jpeg"
+		case ".svg":
+			mime = "image/svg+xml"
+		case ".gif":
+			mime = "image/gif"
+		case ".webp":
+			mime = "image/webp"
+		}
+		return "url(" + readBase64(absResolved, mime) + ")"
+	})
+}
+
 // ── JS module bundler ─────────────────────────────────────────────────────────
 
 var (
@@ -224,7 +274,9 @@ func processHtml(src, rootDir string) string {
 		if m == nil {
 			return match
 		}
-		css := readText(filepath.Join(rootDir, m[1]))
+		cssPath := filepath.Join(rootDir, m[1])
+		css := readText(cssPath)
+		css = inlineCssUrls(css, cssPath, rootDir)
 		return "<style>\n" + css + "\n</style>"
 	})
 

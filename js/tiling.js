@@ -57,6 +57,44 @@ function _renderInlineImages(editorEl) {
   }
 }
 
+// Replace Datatype chart expressions {b:...}, {l:...}, {p:...} with a visible
+// <span> rendered in the Datatype font. The span itself contains the raw
+// syntax text, so jar.toString() preserves it without a separate hidden node.
+function _renderInlineCharts(editorEl) {
+  const regex = /\{([blp]):([\d,]+)\}/;
+  const walker = document.createTreeWalker(
+    editorEl,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: node => {
+        if (node.parentElement?.closest?.('.datatype-chart')) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    }
+  );
+  let node;
+  while ((node = walker.nextNode())) {
+    const text = node.nodeValue;
+    const m = regex.exec(text);
+    if (!m) continue;
+
+    const raw = m[0];
+    const range = document.createRange();
+    range.setStart(node, m.index);
+    range.setEnd(node, m.index + raw.length);
+    range.deleteContents();
+
+    const chart = document.createElement('span');
+    chart.className = 'datatype-chart';
+    chart.contentEditable = 'false';
+    chart.textContent = raw;
+
+    range.insertNode(chart);
+  }
+}
+
 const _cols  = new Map(); // id -> { id, el, paneIds }
 const _panes = new Map(); // id -> pane object
 let _colOrder     = [];
@@ -99,7 +137,7 @@ function _addLongPress(el, paneId) {
     timer = setTimeout(() => {
       timer = null;
       _suppressNext = true;
-      _onContextMenu({ clientX: startX, clientY: startY, preventDefault: () => {} }, paneId);
+      _onContextMenu({ clientX: startX, clientY: startY, target: document.elementFromPoint(startX, startY), preventDefault: () => {} }, paneId);
     }, LONG_PRESS_MS);
   }, { passive: true });
 
@@ -245,7 +283,7 @@ function _onContextMenu(e, paneId) {
     e.preventDefault();
     const pane = _panes.get(paneId);
     let overlay = null;
-    const markEl = e.target.closest('.overlay-mark');
+    const markEl = e.target?.closest('.overlay-mark');
     if (markEl && pane) {
       const ovId = Number(markEl.dataset.ovId);
       const ov = pane.overlays.get(ovId);
@@ -572,6 +610,7 @@ export function createPane(colId, content = '', tagText = null) {
     }
     if (_extraHighlight) _extraHighlight(editor);
     _renderInlineImages(editor);
+    _renderInlineCharts(editor);
     if (pane && pane.showLineNums) _updateLineNumbers();
   }
 
@@ -590,6 +629,20 @@ export function createPane(colId, content = '', tagText = null) {
   tagBarEl.addEventListener('mousedown',   () => _setActive(id));
   editorEl.addEventListener('mousedown',   () => _setActive(id));
   overlayEl.addEventListener('mousedown',   () => _setActive(id));
+  editorEl.addEventListener('mousedown', e => {
+    const chart = e.target.closest('.datatype-chart');
+    if (!chart || e.button !== 0) return;
+    e.preventDefault();
+    const raw = chart.textContent;
+    const node = document.createTextNode(raw);
+    chart.replaceWith(node);
+    const range = document.createRange();
+    range.setStart(node, 0);
+    range.collapse(true);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  });
   editorEl.addEventListener('input',       () => {
     if (!_suppressDirtyFor.has(id)) _markDirty(id);
     clearTimeout(pane._changeTimer);
