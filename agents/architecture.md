@@ -36,6 +36,9 @@ dunno is a tiled text editor. Right-clicking any word in a pane fires it as a co
 | `dunno.remote(url)` | Open a WebSocket and auto-forward all events as JSON. |
 | `dunno.remoteSend(obj)` | Send a one-off JSON message over the remote socket. |
 | `dunno.remoteOff()` | Close the remote socket and stop auto-forwarding. |
+| `dunno.prompt(text, opts?)` | Runs an on-device LLM prompt. Returns a `Promise<string>`. Requires a secure context (HTTPS) and Chrome with built-in AI enabled. |
+| `dunno.promptJSON(text, opts?)` | Same as `prompt`, but parses the response as JSON. Returns `Promise<object>`. |
+| `dunno.isPromptAvailable()` | Returns `Promise<boolean>` — true if an on-device LLM is available or downloadable. |
 
 Command names are case-insensitive. A registered name that matches a built-in overwrites it.
 
@@ -120,6 +123,38 @@ dunno.register('Diff2', editor => {
   // compare editor.getText() with prev.getText() ...
 });
 ```
+
+### Run on-device LLM prompts from a plugin
+
+1. Call `dunno.isPromptAvailable()` to check whether the browser has an on-device model.
+2. Call `await dunno.prompt(text)` to run a prompt and get back a string.
+3. Call `await dunno.promptJSON(text)` if you want structured (JSON) output.
+4. Use `editor.split(key, tag)` to show results in a persistent output pane.
+
+```js
+dunno.register('Summarise', async editor => {
+  if (!await dunno.isPromptAvailable()) {
+    dunno.toast('No on-device LLM');
+    return;
+  }
+  const text = editor.getText();
+  const out = editor.split('summary', 'summary Del');
+  out.setText('⏳ …');
+  try {
+    const result = await dunno.prompt(
+      `Summarise the following text in one paragraph:\n\n${text}`
+    );
+    out.setText(result);
+  } catch (e) {
+    out.setText('! ' + e.message);
+    dunno.toast('Prompt failed: ' + e.message);
+  }
+});
+```
+
+**Requirements:**
+- Chrome with built-in AI flags enabled.
+- Page served over **HTTPS** (or another secure context). The APIs are gated to secure origins even with flags on.
 
 ### Read or write the active pane from outside a command
 

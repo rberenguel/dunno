@@ -38,6 +38,7 @@ import { parseRecipe, buildTable, exportToCanvas } from './recipe.js';
 import { attachCalc } from './calc.js';
 import { renderHelpHTML } from './help.js';
 import { loadVersion } from './version.js';
+import { isAvailable, runPrompt, runPromptJSON } from './prompt.js';
 
 // ── Toast notifications ────────────────────────────────────────────────────────
 
@@ -747,6 +748,36 @@ register('Eval', ctx => {
   getPane(outId)?.jar.updateCode(output);
 });
 
+// ── Prompt ─────────────────────────────────────────────────────────────────────
+
+register('Prompt', async ctx => {
+  const avail = await isAvailable();
+  if (!avail) { _toast('No on-device LLM available'); return; }
+
+  const text = (ctx.selection || ctx.pane.jar.toString()).trim();
+  if (!text) { _toast('Nothing to prompt'); return; }
+
+  let outId = ctx.pane.promptOutputId;
+  if (!outId || !getPane(outId)) {
+    outId = splitPane(ctx.paneId);
+    ctx.pane.promptOutputId = outId;
+    const out = getPane(outId);
+    if (out) { out.tagEl.textContent = 'prompt Del'; out.transient = true; }
+  }
+
+  const outPane = getPane(outId);
+  if (!outPane) return;
+  outPane.jar.updateCode('⏳ …');
+
+  try {
+    const result = await runPrompt(text);
+    outPane.jar.updateCode(result);
+  } catch (e) {
+    outPane.jar.updateCode('! ' + e.message);
+    _toast('Prompt failed: ' + e.message);
+  }
+});
+
 // ── Plot ───────────────────────────────────────────────────────────────────────
 
 function _showPlotTooltip(series, x, y, color, clientX, clientY) {
@@ -1222,6 +1253,15 @@ window.dunno = {
   getPreviousEditor() {
     const pane = getPrev();
     return pane ? _editorHandle(pane) : null;
+  },
+  async prompt(text, opts) {
+    return runPrompt(text, opts);
+  },
+  async promptJSON(text, opts) {
+    return runPromptJSON(text, opts);
+  },
+  isPromptAvailable() {
+    return isAvailable();
   },
   toast: msg => _toast(msg),
   isDark: () => document.body.classList.contains('dark'),
